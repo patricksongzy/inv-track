@@ -1,9 +1,11 @@
-use juniper::FieldError;
 use redis::{AsyncCommands, RedisError};
 use serde::{Deserialize, Serialize};
 
+use crate::error::AppError;
 use crate::graphql::Context;
-use crate::model::{item, location, transaction};
+use crate::model::item::Item;
+use crate::model::location::Location;
+use crate::model::transaction::Transaction;
 
 /// The type of modification.
 #[derive(Serialize, Deserialize, GraphQLEnum)]
@@ -25,7 +27,7 @@ pub(crate) async fn broadcast<T: Serialize>(
     context: &Context,
     channel_name: &str,
     modification: ModificationType,
-    result: &Result<T, FieldError>,
+    result: &Result<T, AppError>,
 ) {
     if let Ok(created) = &result {
         let modification = Modification {
@@ -33,7 +35,7 @@ pub(crate) async fn broadcast<T: Serialize>(
             data: created,
         };
 
-        if let Ok(mut redis_conn) = context.redis.get_async_connection().await {
+        if let Ok(mut redis_conn) = context.clients.redis.get_async_connection().await {
             let _: Result<(), RedisError> = redis_conn
                 .publish(channel_name, serde_json::to_string(&modification).unwrap())
                 .await;
@@ -43,9 +45,9 @@ pub(crate) async fn broadcast<T: Serialize>(
 
 /// A modification on an item.
 #[graphql_object(name = "ItemModification", context = Context)]
-impl Modification<item::Item> {
+impl Modification<Item> {
     /// The item modified.
-    fn item(&self) -> &item::Item {
+    fn item(&self) -> &Item {
         &self.data
     }
 
@@ -57,9 +59,9 @@ impl Modification<item::Item> {
 
 /// A modification on a transaction.
 #[graphql_object(name = "TransactionModification", context = Context)]
-impl Modification<transaction::Transaction> {
+impl Modification<Transaction> {
     /// The transaction modified.
-    fn transaction(&self) -> &transaction::Transaction {
+    fn transaction(&self) -> &Transaction {
         &self.data
     }
 
@@ -71,9 +73,9 @@ impl Modification<transaction::Transaction> {
 
 /// A modification on a location.
 #[graphql_object(name = "LocationModification", context = Context)]
-impl Modification<location::Location> {
+impl Modification<Location> {
     /// The location modified.
-    fn location(&self) -> &location::Location {
+    fn location(&self) -> &Location {
         &self.data
     }
 

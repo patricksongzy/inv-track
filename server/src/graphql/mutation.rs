@@ -1,5 +1,4 @@
-use juniper::FieldError;
-
+use crate::error::AppError;
 use crate::graphql::Context;
 use crate::model::{item, location, transaction};
 
@@ -13,21 +12,21 @@ impl RootMutation {
     async fn create_item(
         context: &Context,
         item: item::InsertableItem,
-    ) -> Result<item::Item, FieldError> {
+    ) -> Result<item::Item, AppError> {
         item::create_item(context, item).await
     }
 
     /// The mutation to update an item with the given id.
     async fn update_item(
         context: &Context,
-        id: i32,
+        id: item::ItemId,
         item: item::InsertableItem,
-    ) -> Result<item::Item, FieldError> {
+    ) -> Result<item::Item, AppError> {
         item::update_item(context, id, item).await
     }
 
     /// The mutation to delete an item with the given id.
-    async fn delete_item(context: &Context, id: i32) -> Result<item::Item, FieldError> {
+    async fn delete_item(context: &Context, id: item::ItemId) -> Result<item::Item, AppError> {
         item::delete_item(context, id).await
     }
 
@@ -35,24 +34,24 @@ impl RootMutation {
     async fn create_transaction(
         context: &Context,
         transaction: transaction::InsertableTransaction,
-    ) -> Result<transaction::Transaction, FieldError> {
+    ) -> Result<transaction::Transaction, AppError> {
         transaction::create_transaction(context, transaction).await
     }
 
     /// The mutation to update a transaction with the given id.
     async fn update_transaction(
         context: &Context,
-        id: i32,
+        id: transaction::TransactionId,
         transaction: transaction::InsertableTransaction,
-    ) -> Result<transaction::Transaction, FieldError> {
+    ) -> Result<transaction::Transaction, AppError> {
         transaction::update_transaction(context, id, transaction).await
     }
 
     /// The mutation to delete a transaction with the given id.
     async fn delete_transaction(
         context: &Context,
-        id: i32,
-    ) -> Result<transaction::Transaction, FieldError> {
+        id: transaction::TransactionId,
+    ) -> Result<transaction::Transaction, AppError> {
         transaction::delete_transaction(context, id).await
     }
 
@@ -60,21 +59,21 @@ impl RootMutation {
     async fn create_location(
         context: &Context,
         location: location::InsertableLocation,
-    ) -> Result<location::Location, FieldError> {
+    ) -> Result<location::Location, AppError> {
         location::create_location(context, location).await
     }
 
     /// The mutation to update a location with the given id.
     async fn update_location(
         context: &Context,
-        id: i32,
+        id: location::LocationId,
         location: location::InsertableLocation,
-    ) -> Result<location::Location, FieldError> {
+    ) -> Result<location::Location, AppError> {
         location::update_location(context, id, location).await
     }
 
     /// The mutation to delete a location with the given id.
-    async fn delete_location(context: &Context, id: i32) -> Result<location::Location, FieldError> {
+    async fn delete_location(context: &Context, id: location::LocationId) -> Result<location::Location, AppError> {
         location::delete_location(context, id).await
     }
 }

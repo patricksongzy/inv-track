@@ -1,18 +1,28 @@
-use juniper::FieldError;
+use std::collections::HashMap;
+use std::fmt::Debug;
+
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
-use crate::graphql::Context;
+use crate::error::AppError;
+use crate::graphql::{Clients, Context};
+use crate::batcher::id_loader::IdLoader;
 use crate::model::modification::{self, ModificationType};
-use crate::model::{item, location};
+use crate::model::item::{self, Item, ItemId, ItemQuantity};
+use crate::model::location::{self, Location, LocationId};
+
+/// The id fo a transaction.
+#[derive(GraphQLScalarValue, PartialEq, Eq, Hash, Copy, Clone, Debug, sqlx::Type, Serialize, Deserialize)]
+#[sqlx(transparent)]
+pub(crate) struct TransactionId(i32);
 
 /// Transaction model returned by a query in the inventory tracking system.
-#[derive(Debug, PartialEq, sqlx::FromRow, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, sqlx::FromRow, Serialize, Deserialize)]
 pub(crate) struct Transaction {
-    id: i32,
-    item_id: i32,
-    location_id: Option<i32>,
-    quantity: i32,
+    id: TransactionId,
+    pub(crate) item_id: ItemId,
+    pub(crate) location_id: Option<LocationId>,
+    quantity: ItemQuantity,
     comment: Option<String>,
 }
 
@@ -20,44 +30,58 @@ pub(crate) struct Transaction {
 #[derive(Debug, PartialEq, Validate, Deserialize, GraphQLInputObject)]
 #[graphql(description = "A transaction to input to the inventory system.")]
 pub(crate) struct InsertableTransaction {
-    item_id: i32,
-    location_id: Option<i32>,
-    quantity: i32,
+    item_id: ItemId,
+    location_id: Option<LocationId>,
+    quantity: ItemQuantity,
     comment: Option<String>,
 }
 
 /// Gets all transactions, returning the result, or a field error.
-pub(crate) async fn get_transactions(context: &Context) -> Result<Vec<Transaction>, FieldError> {
+pub(crate) async fn get_transactions(context: &Context) -> Result<Vec<Transaction>, AppError> {
     sqlx::query_as::<_, Transaction>(
         r#"
         select id, item_id, location_id, quantity, comment from transactions
     "#,
     )
-    .fetch_all(&*context.pool)
+    .fetch_all(&*context.clients.postgres)
     .await
-    .map_err(FieldError::from)
+    .map_err(AppError::from)
+}
+
+/// Gets all transactions with the given ids.
+pub(crate) async fn get_transactions_by_ids(
+    clients: &Clients,
+    ids: Vec<TransactionId>,
+) -> Result<HashMap<TransactionId, Transaction>, AppError> {
+    sqlx::query_as::<_, Transaction>(
+        r#"
+        select id, item_id, location_id, quantity, comment from transactions
+        where id = any($1)
+    "#,
+    )
+    .bind(ids.into_iter().map(|id| id.0).collect::<Vec<i32>>())
+    .fetch_all(&*clients.postgres)
+    .await
+    .map(|transactions| {
+        transactions
+            .into_iter()
+            .map(|transaction| (transaction.id, transaction))
+            .collect()
+    })
+    .map_err(AppError::from)
 }
 
 /// Gets an transaction, given an id, returning the result, or a field error.
-pub(crate) async fn get_transaction(context: &Context, id: i32) -> Result<Transaction, FieldError> {
-    sqlx::query_as::<_, Transaction>(
-        r#"
-        select id, item_id, location_id, quantity, comment from transactions
-        where id = $1
-    "#,
-    )
-    .bind(id)
-    .fetch_one(&*context.pool)
-    .await
-    .map_err(FieldError::from)
+pub(crate) async fn get_transaction(context: &Context, id: TransactionId) -> Result<Transaction, AppError> {
+    context.loaders.get::<IdLoader<TransactionId, Transaction>>().unwrap().load(id).await
 }
 
 /// Creates an transaction, given an insertable transaction, returning the result, or a field error.
 pub(crate) async fn create_transaction(
     context: &Context,
     transaction: InsertableTransaction,
-) -> Result<Transaction, FieldError> {
-    transaction.validate().map_err(FieldError::from)?;
+) -> Result<Transaction, AppError> {
+    transaction.validate().map_err(AppError::from_validation)?;
     let result = sqlx::query_as::<_, Transaction>(
         r#"
         insert into transactions (item_id, location_id, quantity, comment)
@@ -69,9 +93,9 @@ pub(crate) async fn create_transaction(
     .bind(transaction.location_id)
     .bind(transaction.quantity)
     .bind(transaction.comment)
-    .fetch_one(&*context.pool)
+    .fetch_one(&*context.clients.postgres)
     .await
-    .map_err(FieldError::from);
+    .map_err(AppError::from);
 
     // publish the created event using redis pubsub and send the created transaction data
     modification::broadcast(context, "transactions", ModificationType::Create, &result).await;
@@ -82,10 +106,10 @@ pub(crate) async fn create_transaction(
 /// Updates an transaction, given an insertable transaction, returning the result, or a field error.
 pub(crate) async fn update_transaction(
     context: &Context,
-    id: i32,
+    id: TransactionId,
     transaction: InsertableTransaction,
-) -> Result<Transaction, FieldError> {
-    transaction.validate().map_err(FieldError::from)?;
+) -> Result<Transaction, AppError> {
+    transaction.validate().map_err(AppError::from_validation)?;
     let result = sqlx::query_as::<_, Transaction>(
         r#"
         update transactions
@@ -99,9 +123,9 @@ pub(crate) async fn update_transaction(
     .bind(transaction.quantity)
     .bind(transaction.comment)
     .bind(id)
-    .fetch_one(&*context.pool)
+    .fetch_one(&*context.clients.postgres)
     .await
-    .map_err(FieldError::from);
+    .map_err(AppError::from);
 
     // publish the updated event using redis pubsub and send the created transaction data
     modification::broadcast(context, "transactions", ModificationType::Update, &result).await;
@@ -112,8 +136,8 @@ pub(crate) async fn update_transaction(
 /// Deletes an transaction, given an id, returning the result, or a field error.
 pub(crate) async fn delete_transaction(
     context: &Context,
-    id: i32,
-) -> Result<Transaction, FieldError> {
+    id: TransactionId,
+) -> Result<Transaction, AppError> {
     let result = sqlx::query_as::<_, Transaction>(
         r#"
         delete from transactions
@@ -122,9 +146,9 @@ pub(crate) async fn delete_transaction(
     "#,
     )
     .bind(id)
-    .fetch_one(&*context.pool)
+    .fetch_one(&*context.clients.postgres)
     .await
-    .map_err(FieldError::from);
+    .map_err(AppError::from);
 
     // publish the deleted event using redis pubsub and send the transaction data
     modification::broadcast(context, "transactions", ModificationType::Delete, &result).await;
@@ -136,19 +160,19 @@ pub(crate) async fn delete_transaction(
 #[graphql_object(context = Context)]
 impl Transaction {
     /// The id of the transaction.
-    fn id(&self) -> i32 {
+    fn id(&self) -> TransactionId {
         self.id
     }
 
     /// The item of the transaction.
-    async fn item(&self, context: &Context) -> item::Item {
+    async fn item(&self, context: &Context) -> Item {
         item::get_item(context, self.item_id)
             .await
             .expect("dangling transaction has no item")
     }
 
     /// The location of the transaction.
-    async fn location(&self, context: &Context) -> Option<location::Location> {
+    async fn location(&self, context: &Context) -> Option<Location> {
         match self.location_id {
             Some(location_id) => location::get_location(context, location_id).await.ok(),
             None => None,
@@ -156,7 +180,7 @@ impl Transaction {
     }
 
     /// The change in quantity of items of the transaction.
-    fn quantity(&self) -> i32 {
+    fn quantity(&self) -> ItemQuantity {
         self.quantity
     }
 

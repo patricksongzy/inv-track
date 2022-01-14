@@ -11,11 +11,18 @@ use crate::graphql::mutation::RootMutation;
 use crate::graphql::query::RootQuery;
 use crate::graphql::subscription::RootSubscription;
 
+/// The clients of the application.
+#[derive(Clone)]
+pub(crate) struct Clients {
+    pub(crate) postgres: Arc<Pool<Postgres>>,
+    pub(crate) redis: Arc<redis::Client>,
+}
+
 /// The context of the application.
 #[derive(Clone)]
 pub(crate) struct Context {
-    pub(crate) pool: Arc<Pool<Postgres>>,
-    pub(crate) redis: Arc<redis::Client>,
+    pub(crate) clients: Clients,
+    pub(crate) loaders: Arc<anymap::Map<dyn anymap::any::Any + Send + Sync>>,
 }
 
 /// Marker implementation for juniper contexts.

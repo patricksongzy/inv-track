@@ -6,7 +6,9 @@
 #[macro_use]
 extern crate juniper;
 
+mod batcher;
 mod db;
+mod error;
 mod graphql;
 mod model;
 mod store;
@@ -17,7 +19,7 @@ use std::time::Duration;
 
 use actix_web::{middleware, web, App, Error, HttpRequest, HttpResponse, HttpServer};
 
-use crate::graphql::Context;
+use crate::graphql::{Clients, Context};
 
 /// Connection config keep alive interval in seconds.
 const CONFIG_KEEP_ALIVE: u64 = 15;
@@ -44,12 +46,7 @@ async fn subscriptions_route(
     context: web::Data<Context>,
     schema: web::Data<graphql::Schema>,
 ) -> Result<HttpResponse, Error> {
-    // clone the context since ownership is required by the connection config
-    let config_context = Context {
-        pool: Arc::clone(&context.pool),
-        redis: Arc::clone(&context.redis),
-    };
-    let config = juniper_graphql_ws::ConnectionConfig::new(config_context);
+    let config = juniper_graphql_ws::ConnectionConfig::new((*context.into_inner()).clone());
     let config = config.with_keep_alive_interval(Duration::from_secs(CONFIG_KEEP_ALIVE));
     juniper_actix::subscriptions::subscriptions_handler(req, payload, schema.into_inner(), config)
         .await
@@ -59,13 +56,21 @@ async fn subscriptions_route(
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     // create the redis client and db pool, storing them in the context
-    let redis = store::get_client()
-        .await
-        .expect("unable to connect to redis");
-    let pool = db::get_pool().await;
+    let redis = Arc::new(
+        store::get_client()
+            .await
+            .expect("unable to connect to redis"),
+    );
+    let postgres = Arc::new(db::get_pool().await);
+
+    let clients = Clients { postgres, redis };
+
+    let mut loaders = anymap::Map::new();
+    batcher::register_loaders(&clients, &mut loaders);
+
     let context = Context {
-        pool: Arc::new(pool),
-        redis: Arc::new(redis),
+        clients,
+        loaders: Arc::new(loaders),
     };
 
     HttpServer::new(move || {

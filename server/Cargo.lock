@@ -266,6 +266,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "84450d0b4a8bd1ba4144ce8ce718fbc5d071358b1e5384bace6536b3d1f2d5b3"
 
 [[package]]
+name = "anymap"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "33954243bd79057c2de7338850b85983a44588021f8a5fee574a8888c6de4344"
+
+[[package]]
 name = "ascii"
 version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1220,9 +1226,10 @@ name = "inv-track"
 version = "0.1.0"
 dependencies = [
  "actix-web",
+ "anymap",
  "async-stream",
+ "async-trait",
  "dataloader",
- "derive_more",
  "juniper",
  "juniper_actix",
  "juniper_graphql_ws",

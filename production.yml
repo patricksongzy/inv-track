@@ -1,0 +1,7 @@
+version: '3.8'
+services:
+  server:
+    restart: on-failure
+    command: [sh, -c, "sqlx database create && sqlx migrate run && cargo run --release"]
+  db:
+    restart: on-failure

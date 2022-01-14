@@ -1,0 +1,48 @@
+version: '3.8'
+services:
+  server:
+    build: ./server
+    ports:
+      - "${ACTIX_PORT}:${ACTIX_PORT}"
+    environment:
+      ACTIX_ADDRESS: ${ACTIX_ADDRESS}
+      ACTIX_PORT: ${ACTIX_PORT}
+      REDIS_ADDRESS: redis://redis:6379/
+      DATABASE_MAX_CONNECTIONS: ${DATABASE_MAX_CONNECTIONS}
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db/${DATABASE_NAME}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      # cache cargo dependencies
+      - cargo:/usr/local/cargo
+      # cargo watch for changes to source
+      - ./server:/usr/src/app
+    command: [sh, -c, "sqlx database create && sqlx migrate run && cargo watch -x run"]
+  db:
+    image: postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  redis:
+    image: redis
+    ports:
+      - 6379:6379
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+volumes:
+  cargo:
+  pgdata:

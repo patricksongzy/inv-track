@@ -1,0 +1,4 @@
+version: '3.8'
+services:
+  server:
+    command: [sh, -c, "sqlx database create && sqlx migrate run && cargo test -- --test-threads=1"]

@@ -24,7 +24,10 @@ impl RootQuery {
     }
 
     /// The query to retrieve a single transaction by id.
-    async fn transaction(context: &Context, id: transaction::TransactionId) -> Result<transaction::Transaction, AppError> {
+    async fn transaction(
+        context: &Context,
+        id: transaction::TransactionId,
+    ) -> Result<transaction::Transaction, AppError> {
         transaction::get_transaction(context, id).await
     }
 
@@ -34,7 +37,10 @@ impl RootQuery {
     }
 
     /// The query to retrieve a single location by id.
-    async fn location(context: &Context, id: location::LocationId) -> Result<location::Location, AppError> {
+    async fn location(
+        context: &Context,
+        id: location::LocationId,
+    ) -> Result<location::Location, AppError> {
         location::get_location(context, id).await
     }
 }

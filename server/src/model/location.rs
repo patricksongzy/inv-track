@@ -4,14 +4,26 @@ use std::fmt::Debug;
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
+use crate::batcher::id_loader::IdLoader;
 use crate::error::AppError;
 use crate::graphql::{Clients, Context};
-use crate::batcher::id_loader::IdLoader;
 use crate::model::modification::{self, ModificationType};
 use crate::model::transaction::Transaction;
 
 /// The id of a location.
-#[derive(GraphQLScalarValue, PartialEq, Eq, Hash, Copy, Clone, Debug, sqlx::Type, Serialize, Deserialize)]
+#[derive(
+    PartialEq,
+    Eq,
+    Into,
+    Hash,
+    Copy,
+    Clone,
+    Debug,
+    GraphQLScalarValue,
+    sqlx::Type,
+    Serialize,
+    Deserialize,
+)]
 #[sqlx(transparent)]
 pub(crate) struct LocationId(i32);
 
@@ -97,7 +109,12 @@ pub(crate) async fn get_transactions_by_location_ids(
 
 /// Gets an location, given an id, returning the result, or a field error.
 pub(crate) async fn get_location(context: &Context, id: LocationId) -> Result<Location, AppError> {
-    context.loaders.get::<IdLoader<LocationId, Location>>().unwrap().load(id).await
+    context
+        .loaders
+        .get::<IdLoader<LocationId, Location, Clients>>()
+        .unwrap()
+        .load(id)
+        .await
 }
 
 /// Creates an location, given an insertable location, returning the result, or a field error.
@@ -154,7 +171,10 @@ pub(crate) async fn update_location(
 }
 
 /// Deletes an location, given an id, returning the result, or a field error.
-pub(crate) async fn delete_location(context: &Context, id: LocationId) -> Result<Location, AppError> {
+pub(crate) async fn delete_location(
+    context: &Context,
+    id: LocationId,
+) -> Result<Location, AppError> {
     let result = sqlx::query_as::<_, Location>(
         r#"
         delete from locations
@@ -193,6 +213,12 @@ impl Location {
 
     /// The transactions at the location.
     async fn transactions(&self, context: &Context) -> Vec<Transaction> {
-        context.loaders.get::<IdLoader<LocationId, Vec<Transaction>>>().unwrap().load(self.id).await.unwrap_or_default()
+        context
+            .loaders
+            .get::<IdLoader<LocationId, Vec<Transaction>, Clients>>()
+            .unwrap()
+            .load(self.id)
+            .await
+            .unwrap_or_default()
     }
 }

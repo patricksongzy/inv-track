@@ -8,21 +8,27 @@ for development: `docker compose up`\
 integration tests: `docker compose -f docker-compose.yml -f integration-test.yml up`\
 for production: `docker compose -f docker-compose.yml -f production.yml up`
 
-### Cleanup
-`Ctrl+C` then `docker compose down` and prune associated volumes, images and networks
-
-## Design
-### Technologies Used
+## Technologies Used
 * Rust + actix-web + juniper + sqlx
 * Postgresql + Redis
 * Docker Compose
 
-### GraphQL
-* chose GraphQL because of doing a lot of querying (also because it's interesting)
+## GraphQL
+* chose GraphQL of the amount of querying done (also because it's interesting)
+* API endpoint is `/graphql`, playground IDE is `/playground`
+* source code in `/server/src/graphql`
+## Batching Dataloaders (N+1 Problem)
 * batching dataloaders to mitigate the N+1 Problem
+* source code in `/server/src/batcher`
+## Subscriptions
 * subscriptions for real-time data updates
+* endpoint is `/subscriptions`
+* source code in `/server/src/graphql/subscription.rs`
 
-### Extensibility
+## Tetsting
+* tests are located in `/server/src/main.rs` and `/server/src/batcher/id_loader.rs`
+
+## Extensibility
 * add Redis caching layer
   * currently Redis is only used for the pubsub pattern
 * use SeaORM instead of just SQLx
@@ -30,6 +36,10 @@ for production: `docker compose -f docker-compose.yml -f production.yml up`
 * add multi stage docker builds
   * will trim down on image sizes
 * add pagination
+* we explicitly choose to allow for negative quantities
+  * in the future, warnings can be added to the response
+* better error handling
+  * fix errors so that data is still returned for the other queries
 
 ### No NginX
 * ideally we would be using NginX, but since we're not as focused on deployment, the current setup works

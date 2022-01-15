@@ -1225,11 +1225,14 @@ dependencies = [
 name = "inv-track"
 version = "0.1.0"
 dependencies = [
+ "actix-rt",
  "actix-web",
  "anymap",
  "async-stream",
  "async-trait",
  "dataloader",
+ "derive_more",
+ "futures",
  "juniper",
  "juniper_actix",
  "juniper_graphql_ws",

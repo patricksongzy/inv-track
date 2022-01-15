@@ -73,7 +73,10 @@ impl RootMutation {
     }
 
     /// The mutation to delete a location with the given id.
-    async fn delete_location(context: &Context, id: location::LocationId) -> Result<location::Location, AppError> {
+    async fn delete_location(
+        context: &Context,
+        id: location::LocationId,
+    ) -> Result<location::Location, AppError> {
         location::delete_location(context, id).await
     }
 }

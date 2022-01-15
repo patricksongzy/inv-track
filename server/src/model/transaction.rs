@@ -4,15 +4,28 @@ use std::fmt::Debug;
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
+use crate::batcher::id_loader::IdLoader;
 use crate::error::AppError;
 use crate::graphql::{Clients, Context};
-use crate::batcher::id_loader::IdLoader;
-use crate::model::modification::{self, ModificationType};
 use crate::model::item::{self, Item, ItemId, ItemQuantity};
 use crate::model::location::{self, Location, LocationId};
+use crate::model::modification::{self, ModificationType};
+use crate::model::validation;
 
-/// The id fo a transaction.
-#[derive(GraphQLScalarValue, PartialEq, Eq, Hash, Copy, Clone, Debug, sqlx::Type, Serialize, Deserialize)]
+/// The id of a transaction.
+#[derive(
+    PartialEq,
+    Eq,
+    Into,
+    Hash,
+    Copy,
+    Clone,
+    Debug,
+    GraphQLScalarValue,
+    sqlx::Type,
+    Serialize,
+    Deserialize,
+)]
 #[sqlx(transparent)]
 pub(crate) struct TransactionId(i32);
 
@@ -30,8 +43,10 @@ pub(crate) struct Transaction {
 #[derive(Debug, PartialEq, Validate, Deserialize, GraphQLInputObject)]
 #[graphql(description = "A transaction to input to the inventory system.")]
 pub(crate) struct InsertableTransaction {
-    item_id: ItemId,
-    location_id: Option<LocationId>,
+    #[serde(rename = "itemId")]
+    pub(crate) item_id: ItemId,
+    #[serde(rename = "locationId")]
+    pub(crate) location_id: Option<LocationId>,
     quantity: ItemQuantity,
     comment: Option<String>,
 }
@@ -72,8 +87,16 @@ pub(crate) async fn get_transactions_by_ids(
 }
 
 /// Gets an transaction, given an id, returning the result, or a field error.
-pub(crate) async fn get_transaction(context: &Context, id: TransactionId) -> Result<Transaction, AppError> {
-    context.loaders.get::<IdLoader<TransactionId, Transaction>>().unwrap().load(id).await
+pub(crate) async fn get_transaction(
+    context: &Context,
+    id: TransactionId,
+) -> Result<Transaction, AppError> {
+    context
+        .loaders
+        .get::<IdLoader<TransactionId, Transaction, Clients>>()
+        .unwrap()
+        .load(id)
+        .await
 }
 
 /// Creates an transaction, given an insertable transaction, returning the result, or a field error.
@@ -82,6 +105,10 @@ pub(crate) async fn create_transaction(
     transaction: InsertableTransaction,
 ) -> Result<Transaction, AppError> {
     transaction.validate().map_err(AppError::from_validation)?;
+
+    // check that the item and location exist
+    validation::transaction::validate_ids(context, &transaction).await?;
+
     let result = sqlx::query_as::<_, Transaction>(
         r#"
         insert into transactions (item_id, location_id, quantity, comment)
@@ -110,6 +137,10 @@ pub(crate) async fn update_transaction(
     transaction: InsertableTransaction,
 ) -> Result<Transaction, AppError> {
     transaction.validate().map_err(AppError::from_validation)?;
+
+    // check that the item and location exist
+    validation::transaction::validate_ids(context, &transaction).await?;
+
     let result = sqlx::query_as::<_, Transaction>(
         r#"
         update transactions

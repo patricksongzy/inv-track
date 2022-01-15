@@ -5,10 +5,10 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 use crate::error::AppError;
-use crate::graphql::{Context, Clients};
-use crate::model::modification::Modification;
+use crate::graphql::{Clients, Context};
 use crate::model::item::Item;
 use crate::model::location::Location;
+use crate::model::modification::Modification;
 use crate::model::transaction::Transaction;
 
 /// The root subscription.
@@ -46,9 +46,7 @@ impl RootSubscription {
     }
 
     /// The subscription to modifications of transactions.
-    async fn transaction_subscription(
-        context: &Context,
-    ) -> ModificationStream<Transaction> {
+    async fn transaction_subscription(context: &Context) -> ModificationStream<Transaction> {
         subscription_stream(&context.clients, "transactions").await
     }
 

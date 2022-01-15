@@ -4,26 +4,33 @@ use std::fmt::Debug;
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
+use crate::batcher::id_loader::IdLoader;
 use crate::error::AppError;
 use crate::graphql::{Clients, Context};
-use crate::batcher::id_loader::IdLoader;
 use crate::model::modification::{self, ModificationType};
 use crate::model::transaction::Transaction;
-
-// TODO LIST
-// 1. testing
-// 2. validation before db
-//   * check transaction item_id, location_id exists
-//   * check item sku is unique
-//   * check quantity is positive after transaction
-// 3. front end
+use crate::model::validation;
 
 /// The id of an item.
-#[derive(GraphQLScalarValue, PartialEq, Eq, Hash, Copy, Clone, Debug, sqlx::Type, Serialize, Deserialize)]
+#[derive(
+    PartialEq,
+    Eq,
+    Into,
+    Hash,
+    Copy,
+    Clone,
+    Debug,
+    GraphQLScalarValue,
+    sqlx::Type,
+    Serialize,
+    Deserialize,
+)]
 #[sqlx(transparent)]
 pub(crate) struct ItemId(i32);
 /// The quantity of inventory.
-#[derive(GraphQLScalarValue, PartialEq, Copy, Clone, Debug, sqlx::Type, Serialize, Deserialize)]
+#[derive(
+    PartialEq, Into, Neg, Copy, Clone, Debug, GraphQLScalarValue, sqlx::Type, Serialize, Deserialize,
+)]
 #[sqlx(transparent)]
 pub(crate) struct ItemQuantity(i32);
 
@@ -42,7 +49,7 @@ pub(crate) struct Item {
 #[graphql(description = "An item to input to the inventory system.")]
 pub(crate) struct InsertableItem {
     #[validate(length(min = 1, message = "sku must be at least 1 character long"))]
-    sku: Option<String>,
+    pub(crate) sku: Option<String>,
     #[validate(length(min = 1, message = "name must be at least 1 character long"))]
     name: String,
     supplier: Option<String>,
@@ -135,12 +142,21 @@ pub(crate) async fn get_quantities_by_item_ids(
 
 /// Gets an item, given an id, returning the result, or a field error.
 pub(crate) async fn get_item(context: &Context, id: ItemId) -> Result<Item, AppError> {
-    context.loaders.get::<IdLoader<ItemId, Item>>().unwrap().load(id).await
+    context
+        .loaders
+        .get::<IdLoader<ItemId, Item, Clients>>()
+        .unwrap()
+        .load(id)
+        .await
 }
 
 /// Creates an item, given an insertable item, returning the result, or a field error.
 pub(crate) async fn create_item(context: &Context, item: InsertableItem) -> Result<Item, AppError> {
     item.validate().map_err(AppError::from_validation)?;
+
+    // check that the sku is unique
+    validation::item::validate_sku(context, &item).await?;
+
     let result = sqlx::query_as::<_, Item>(
         r#"
         insert into items (sku, name, supplier, description)
@@ -242,11 +258,23 @@ impl Item {
 
     /// The quantity of the item.
     async fn quantity(&self, context: &Context) -> ItemQuantity {
-        context.loaders.get::<IdLoader<ItemId, ItemQuantity>>().unwrap().load(self.id).await.unwrap_or(ItemQuantity(0))
+        context
+            .loaders
+            .get::<IdLoader<ItemId, ItemQuantity, Clients>>()
+            .unwrap()
+            .load(self.id)
+            .await
+            .unwrap_or(ItemQuantity(0))
     }
 
     /// The transactions of the item.
     async fn transactions(&self, context: &Context) -> Vec<Transaction> {
-        context.loaders.get::<IdLoader<ItemId, Vec<Transaction>>>().unwrap().load(self.id).await.unwrap_or_default()
+        context
+            .loaders
+            .get::<IdLoader<ItemId, Vec<Transaction>, Clients>>()
+            .unwrap()
+            .load(self.id)
+            .await
+            .unwrap_or_default()
     }
 }

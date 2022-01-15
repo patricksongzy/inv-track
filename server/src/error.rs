@@ -39,14 +39,20 @@ impl AppError {
             // only include field validation errors
             if let validator::ValidationErrorsKind::Field(field_errors) = error_kind {
                 // field validation error entries
-                let entries = field_errors.iter().map(|error| {
-                    // add the code, message and params
-                    let mut data = juniper::Object::with_capacity(3);
-                    data.add_field("code", graphql_value!(error.code.to_string()));
-                    data.add_field("message", graphql_value!(error.message.as_ref().map(|s| s.to_string())));
-                    data.add_field("params", graphql_value!(format!("{:?}", error.params)));
-                    graphql_value!(data)
-                }).collect::<Vec<juniper::Value>>();
+                let entries = field_errors
+                    .iter()
+                    .map(|error| {
+                        // add the code, message and params
+                        let mut data = juniper::Object::with_capacity(3);
+                        data.add_field("code", graphql_value!(error.code.to_string()));
+                        data.add_field(
+                            "message",
+                            graphql_value!(error.message.as_ref().map(|s| s.to_string())),
+                        );
+                        data.add_field("params", graphql_value!(format!("{:?}", error.params)));
+                        graphql_value!(data)
+                    })
+                    .collect::<Vec<juniper::Value>>();
 
                 // field error data
                 let mut error_data = juniper::Object::with_capacity(2);
@@ -57,7 +63,10 @@ impl AppError {
         }
 
         Self {
-            message: format!("operation failed with validation errors on fields: {}", keys.cloned().collect::<Vec<&str>>().join(", ")),
+            message: format!(
+                "operation failed with validation errors on fields: {}",
+                keys.cloned().collect::<Vec<&str>>().join(", ")
+            ),
             data: juniper::Value::List(errors),
         }
     }

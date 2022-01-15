@@ -47,6 +47,16 @@ for production: `docker compose -f docker-compose.yml -f production.yml up`
 ## Third-party Crates
 multiple open-source crates were used to build this. Their licences are included below.
 
-| Crate       | Licence                                                           |
-|-------------|-------------------------------------------------------------------|
-| validator   | [MIT](https://github.com/Keats/validator/blob/master/LICENSE)     |
+| Crate       | Licence                                                                       |
+|-------------|-------------------------------------------------------------------------------|
+| actix       | [MIT/Apache 2.0](https://github.com/actix/actix#license)                      |
+| anymap      | [MIT/Apache 2.0](https://github.com/chris-morgan/anymap#license)              |
+| async-trait | [MIT/Apache 2.0](https://github.com/dtolnay/async-trait#license)              |
+| chrono      | [MIT/Apache 2.0](https://github.com/chronotope/chrono/blob/main/LICENSE.txt)  |
+| serde       | [MIT/Apache 2.0](https://github.com/serde-rs/serde#license)                   |
+| sqlx        | [MIT](https://github.com/jmoiron/sqlx/blob/master/LICENSE)                    |
+| juniper     | [BSD-2](https://github.com/graphql-rust/juniper/blob/master/LICENSE)          |
+| redis-rs    | [BSD-3](https://github.com/mitsuhiko/redis-rs/blob/master/LICENSE)            |
+| dataloader  | [MIT/Apache 2.0](https://github.com/cksac/dataloader-rs#license)              |
+| derive_more | [MIT](https://github.com/JelteF/derive_more/blob/master/LICENSE)              |
+| validator   | [MIT](https://github.com/Keats/validator/blob/master/LICENSE)                 |

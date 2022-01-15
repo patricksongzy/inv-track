@@ -1,5 +1,14 @@
 version: '3.8'
 services:
+  ui:
+    build: ./app-ui
+    ports:
+      - "${VUE_PORT}:${VUE_PORT}"
+    depends_on:
+      - server
+    volumes:
+      - ./app-ui:/usr/src/app/app-ui
+    command: [sh, -c, "npm run serve"]
   server:
     build: ./server
     ports:
@@ -19,10 +28,10 @@ services:
       # cache cargo dependencies
       - cargo:/usr/local/cargo
       # cargo watch for changes to source
-      - ./server:/usr/src/app
+      - ./server:/usr/src/app/server
     command: [sh, -c, "sqlx database create && sqlx migrate run && cargo watch -x run"]
   db:
-    image: postgres
+    image: postgres:14.1
     ports:
       - "5432:5432"
     environment:
@@ -35,7 +44,7 @@ services:
       timeout: 5s
       retries: 10
   redis:
-    image: redis
+    image: redis:6.2
     ports:
       - 6379:6379
     volumes:

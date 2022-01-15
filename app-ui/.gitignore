@@ -1,8 +1,6 @@
-/server/target
-/postgresql
 .DS_Store
 node_modules
-/app-ui/dist
+/dist
 
 
 # local env files
@@ -23,4 +21,3 @@ pnpm-debug.log*
 *.njsproj
 *.sln
 *.sw?
-

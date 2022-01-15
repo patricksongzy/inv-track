@@ -1,25 +1,28 @@
 <template>
-  <item-list></item-list>
+  <div id="app">
+    <nav-bar />
+    <router-view />
+  </div>
 </template>
 
 <script>
 import { createClient, defaultExchanges, provideClient, subscriptionExchange } from '@urql/vue';
 import { createClient as createWsClient } from 'graphql-ws';
 
-import ItemList from './components/ItemList.vue';
+import NavBar from './components/NavBar.vue';
 
 export default {
   name: 'App',
   components: {
-    ItemList,
+    NavBar,
   },
   setup() {
     const wsClient = createWsClient({
-      url: 'ws://localhost:8000/subscriptions',
+      url: `ws://localhost:8000/subscriptions`,
     });
 
     const client = createClient({
-      url: 'http://localhost:8000/graphql',
+      url: `http://localhost:8000/graphql`,
       exchanges: [
         ...defaultExchanges,
         subscriptionExchange({

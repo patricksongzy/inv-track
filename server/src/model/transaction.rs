@@ -113,7 +113,7 @@ pub(crate) async fn create_transaction(
     // check that the item and location exist
     validation::transaction::validate_ids(context, &transaction).await?;
 
-    let result = sqlx::query_as::<_, Transaction>(
+    let created = sqlx::query_as::<_, Transaction>(
         r#"
         insert into transactions (item_id, location_id, transaction_date, quantity, comment)
         values ($1, $2, $3, $4, $5)
@@ -127,12 +127,12 @@ pub(crate) async fn create_transaction(
     .bind(transaction.comment)
     .fetch_one(&*context.clients.postgres)
     .await
-    .map_err(AppError::from);
+    .map_err(AppError::from)?;
 
     // publish the created event using redis pubsub and send the created transaction data
-    modification::broadcast(context, "transactions", ModificationType::Create, &result).await;
+    created.broadcast_update(context, ModificationType::Create).await;
 
-    result
+    Ok(created)
 }
 
 /// Updates an transaction, given an insertable transaction, returning the result, or a field error.
@@ -146,7 +146,7 @@ pub(crate) async fn update_transaction(
     // check that the item and location exist
     validation::transaction::validate_ids(context, &transaction).await?;
 
-    let result = sqlx::query_as::<_, Transaction>(
+    let updated = sqlx::query_as::<_, Transaction>(
         r#"
         update transactions
         set item_id = $1, location_id = $2, quantity = $3, transaction_date = $4, comment = $5
@@ -162,12 +162,12 @@ pub(crate) async fn update_transaction(
     .bind(id)
     .fetch_one(&*context.clients.postgres)
     .await
-    .map_err(AppError::from);
+    .map_err(AppError::from)?;
 
-    // publish the updated event using redis pubsub and send the created transaction data
-    modification::broadcast(context, "transactions", ModificationType::Update, &result).await;
+    // publish the deleted event using redis pubsub and send the transaction data
+    updated.broadcast_update(context, ModificationType::Update).await;
 
-    result
+    Ok(updated)
 }
 
 /// Deletes an transaction, given an id, returning the result, or a field error.
@@ -175,7 +175,7 @@ pub(crate) async fn delete_transaction(
     context: &Context,
     id: TransactionId,
 ) -> Result<Transaction, AppError> {
-    let result = sqlx::query_as::<_, Transaction>(
+    let deleted = sqlx::query_as::<_, Transaction>(
         r#"
         delete from transactions
         where id = $1
@@ -185,12 +185,38 @@ pub(crate) async fn delete_transaction(
     .bind(id)
     .fetch_one(&*context.clients.postgres)
     .await
-    .map_err(AppError::from);
+    .map_err(AppError::from)?;
 
     // publish the deleted event using redis pubsub and send the transaction data
-    modification::broadcast(context, "transactions", ModificationType::Delete, &result).await;
+    deleted.broadcast_update(context, ModificationType::Delete).await;
 
-    result
+    Ok(deleted)
+}
+
+impl Transaction {
+    async fn get_item(&self, context: &Context) -> Option<Item> {
+        item::get_item(context, self.item_id)
+            .await
+            .ok()
+    }
+
+    async fn get_location(&self, context: &Context) -> Option<Location> {
+        match self.location_id {
+            Some(location_id) => location::get_location(context, location_id).await.ok(),
+            None => None,
+        }
+    }
+
+    async fn broadcast_update(&self, context: &Context, modification: ModificationType) {
+        // publish the event using redis pubsub and send the transaction data
+        modification::broadcast(context, "transactions", modification, self).await;
+        if let Some(item) = self.get_item(context).await {
+            modification::broadcast(context, "items", ModificationType::Update, &item).await;
+        }
+        if let Some(location) = self.get_location(context).await {
+            modification::broadcast(context, "locations", ModificationType::Update, &location).await;
+        }
+    }
 }
 
 /// An transaction in the inventory tracking system.
@@ -203,17 +229,13 @@ impl Transaction {
 
     /// The item of the transaction.
     async fn item(&self, context: &Context) -> Item {
-        item::get_item(context, self.item_id)
-            .await
+        self.get_item(context).await
             .expect("dangling transaction has no item")
     }
 
     /// The location of the transaction.
     async fn location(&self, context: &Context) -> Option<Location> {
-        match self.location_id {
-            Some(location_id) => location::get_location(context, location_id).await.ok(),
-            None => None,
-        }
+        self.get_location(context).await
     }
 
     /// The date of the transaction.

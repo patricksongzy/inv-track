@@ -19,7 +19,7 @@ use std::env;
 use std::sync::Arc;
 use std::time::Duration;
 
-use actix_web::{middleware, web, App, Error, HttpRequest, HttpResponse, HttpServer};
+use actix_web::{middleware, http, web, App, Error, HttpRequest, HttpResponse, HttpServer};
 
 use crate::graphql::{Clients, Context};
 
@@ -86,6 +86,13 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(graphql::schema()))
             .wrap(middleware::Compress::default())
             .wrap(middleware::Logger::default())
+            .wrap(
+                actix_cors::Cors::default()
+                    .allow_any_origin()
+                    .allowed_methods(vec!["POST", "GET"])
+                    .allowed_headers(vec![http::header::ACCEPT, http::header::CONTENT_TYPE])
+                    .max_age(3600)
+            )
             .service(
                 web::resource("/graphql")
                     .route(web::post().to(graphql_route))
@@ -93,6 +100,7 @@ async fn main() -> std::io::Result<()> {
             )
             .service(web::resource("/subscriptions").route(web::get().to(subscriptions_route)))
             .service(web::resource("/playground").route(web::get().to(playground_route)))
+            .default_service(web::route().to(|| HttpResponse::NotFound()))
     })
     .bind(format!(
         "{}:{}",
@@ -108,7 +116,7 @@ async fn main() -> std::io::Result<()> {
 mod test {
     use super::*;
 
-    use actix_web::{http, test};
+    use actix_web::test;
 
     /// Macro to set up the test server.
     macro_rules! test_server {

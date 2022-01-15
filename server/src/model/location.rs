@@ -123,7 +123,7 @@ pub(crate) async fn create_location(
     location: InsertableLocation,
 ) -> Result<Location, AppError> {
     location.validate().map_err(AppError::from_validation)?;
-    let result = sqlx::query_as::<_, Location>(
+    let created = sqlx::query_as::<_, Location>(
         r#"
         insert into locations (name, address)
         values ($1, $2)
@@ -134,12 +134,12 @@ pub(crate) async fn create_location(
     .bind(location.address)
     .fetch_one(&*context.clients.postgres)
     .await
-    .map_err(AppError::from);
+    .map_err(AppError::from)?;
 
     // publish the created event using redis pubsub and send the created location data
-    modification::broadcast(context, "locations", ModificationType::Create, &result).await;
+    modification::broadcast(context, "locations", ModificationType::Create, &created).await;
 
-    result
+    Ok(created)
 }
 
 /// Updates an location, given an insertable location, returning the result, or a field error.
@@ -149,7 +149,7 @@ pub(crate) async fn update_location(
     location: InsertableLocation,
 ) -> Result<Location, AppError> {
     location.validate().map_err(AppError::from_validation)?;
-    let result = sqlx::query_as::<_, Location>(
+    let updated = sqlx::query_as::<_, Location>(
         r#"
         update locations
         set name = $1, address = $2
@@ -162,12 +162,12 @@ pub(crate) async fn update_location(
     .bind(id)
     .fetch_one(&*context.clients.postgres)
     .await
-    .map_err(AppError::from);
+    .map_err(AppError::from)?;
 
     // publish the updated event using redis pubsub and send the created location data
-    modification::broadcast(context, "locations", ModificationType::Update, &result).await;
+    modification::broadcast(context, "locations", ModificationType::Update, &updated).await;
 
-    result
+    Ok(updated)
 }
 
 /// Deletes an location, given an id, returning the result, or a field error.
@@ -175,7 +175,7 @@ pub(crate) async fn delete_location(
     context: &Context,
     id: LocationId,
 ) -> Result<Location, AppError> {
-    let result = sqlx::query_as::<_, Location>(
+    let deleted = sqlx::query_as::<_, Location>(
         r#"
         delete from locations
         where id = $1
@@ -185,12 +185,12 @@ pub(crate) async fn delete_location(
     .bind(id)
     .fetch_one(&*context.clients.postgres)
     .await
-    .map_err(AppError::from);
+    .map_err(AppError::from)?;
 
     // publish the deleted event using redis pubsub and send the location data
-    modification::broadcast(context, "locations", ModificationType::Delete, &result).await;
+    modification::broadcast(context, "locations", ModificationType::Delete, &deleted).await;
 
-    result
+    Ok(deleted)
 }
 
 /// An location in the inventory tracking system.

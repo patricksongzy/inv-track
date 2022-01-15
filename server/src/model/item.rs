@@ -157,7 +157,7 @@ pub(crate) async fn create_item(context: &Context, item: InsertableItem) -> Resu
     // check that the sku is unique
     validation::item::validate_sku(context, &item).await?;
 
-    let result = sqlx::query_as::<_, Item>(
+    let created = sqlx::query_as::<_, Item>(
         r#"
         insert into items (sku, name, supplier, description)
         values ($1, $2, $3, $4)
@@ -170,12 +170,12 @@ pub(crate) async fn create_item(context: &Context, item: InsertableItem) -> Resu
     .bind(item.description)
     .fetch_one(&*context.clients.postgres)
     .await
-    .map_err(AppError::from);
+    .map_err(AppError::from)?;
 
     // publish the created event using redis pubsub and send the created item data
-    modification::broadcast(context, "items", ModificationType::Create, &result).await;
+    modification::broadcast(context, "items", ModificationType::Create, &created).await;
 
-    result
+    Ok(created)
 }
 
 /// Updates an item, given an insertable item, returning the result, or a field error.
@@ -185,7 +185,7 @@ pub(crate) async fn update_item(
     item: InsertableItem,
 ) -> Result<Item, AppError> {
     item.validate().map_err(AppError::from_validation)?;
-    let result = sqlx::query_as::<_, Item>(
+    let updated = sqlx::query_as::<_, Item>(
         r#"
         update items
         set sku = $1, name = $2, supplier = $3, description = $4
@@ -200,17 +200,17 @@ pub(crate) async fn update_item(
     .bind(id)
     .fetch_one(&*context.clients.postgres)
     .await
-    .map_err(AppError::from);
+    .map_err(AppError::from)?;
 
-    // publish the updated event using redis pubsub and send the created item data
-    modification::broadcast(context, "items", ModificationType::Update, &result).await;
+    // publish the updated event using redis pubsub and send the item data
+    modification::broadcast(context, "items", ModificationType::Update, &updated).await;
 
-    result
+    Ok(updated)
 }
 
 /// Deletes an item, given an id, returning the result, or a field error.
 pub(crate) async fn delete_item(context: &Context, id: ItemId) -> Result<Item, AppError> {
-    let result = sqlx::query_as::<_, Item>(
+    let deleted = sqlx::query_as::<_, Item>(
         r#"
         delete from items
         where id = $1
@@ -220,12 +220,12 @@ pub(crate) async fn delete_item(context: &Context, id: ItemId) -> Result<Item, A
     .bind(id)
     .fetch_one(&*context.clients.postgres)
     .await
-    .map_err(AppError::from);
+    .map_err(AppError::from)?;
 
     // publish the deleted event using redis pubsub and send the item data
-    modification::broadcast(context, "items", ModificationType::Delete, &result).await;
+    modification::broadcast(context, "items", ModificationType::Delete, &deleted).await;
 
-    result
+    Ok(deleted)
 }
 
 /// An item in the inventory tracking system.

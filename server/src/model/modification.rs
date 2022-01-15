@@ -1,7 +1,6 @@
 use redis::{AsyncCommands, RedisError};
 use serde::{Deserialize, Serialize};
 
-use crate::error::AppError;
 use crate::graphql::Context;
 use crate::model::item::Item;
 use crate::model::location::Location;
@@ -27,19 +26,17 @@ pub(crate) async fn broadcast<T: Serialize>(
     context: &Context,
     channel_name: &str,
     modification: ModificationType,
-    result: &Result<T, AppError>,
+    created: &T,
 ) {
-    if let Ok(created) = &result {
-        let modification = Modification {
-            modification,
-            data: created,
-        };
+    let modification = Modification {
+        modification,
+        data: created,
+    };
 
-        if let Ok(mut redis_conn) = context.clients.redis.get_async_connection().await {
-            let _: Result<(), RedisError> = redis_conn
-                .publish(channel_name, serde_json::to_string(&modification).unwrap())
-                .await;
-        }
+    if let Ok(mut redis_conn) = context.clients.redis.get_async_connection().await {
+        let _: Result<(), RedisError> = redis_conn
+            .publish(channel_name, serde_json::to_string(&modification).unwrap())
+            .await;
     }
 }
 

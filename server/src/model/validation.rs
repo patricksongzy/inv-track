@@ -1,23 +1,8 @@
-use std::borrow::Cow;
+use std::collections::HashMap;
 
-use serde::Serialize;
-use validator::{ValidationError, ValidationErrors};
+use async_graphql::{Error, ErrorExtensions, Result};
 
-use crate::error::AppError;
-use crate::graphql::Context;
-
-fn add_error<T: Serialize>(
-    errors: &mut ValidationErrors,
-    code: &'static str,
-    message: &'static str,
-    field: &'static str,
-    value: T,
-) {
-    let mut error = ValidationError::new(code);
-    error.message = Some(Cow::Borrowed(message));
-    error.add_param(Cow::Borrowed("value"), &value);
-    errors.add(field, error);
-}
+use crate::graphql::AppContext;
 
 pub(crate) mod transaction {
     use super::*;
@@ -25,10 +10,10 @@ pub(crate) mod transaction {
 
     /// Validates that the item and location for a transaction exist.
     pub(crate) async fn validate_ids(
-        context: &Context,
+        context: &AppContext,
         transaction: &InsertableTransaction,
-    ) -> Result<(), AppError> {
-        let mut errors = ValidationErrors::new();
+    ) -> Result<()> {
+        let mut errors = HashMap::new();
 
         // check item exists
         let item_count = sqlx::query!(
@@ -37,18 +22,12 @@ pub(crate) mod transaction {
         )
         .fetch_one(&*context.clients.postgres)
         .await
-        .map_err(AppError::from)?
+        .map_err(Error::from)?
         .count
         .unwrap_or(0);
 
         if item_count != 1 {
-            add_error(
-                &mut errors,
-                "existence",
-                "item not found",
-                "itemId",
-                i32::from(transaction.item_id),
-            );
+            errors.insert("itemId", format!("item with id {:?} not found", transaction.item_id));
         }
 
         // check location exists
@@ -59,25 +38,23 @@ pub(crate) mod transaction {
             )
             .fetch_one(&*context.clients.postgres)
             .await
-            .map_err(AppError::from)?
+            .map_err(Error::from)?
             .count
             .unwrap_or(0);
 
             if location_count != 1 {
-                add_error(
-                    &mut errors,
-                    "existence",
-                    "location not found",
-                    "locationId",
-                    i32::from(location_id),
-                );
+                errors.insert("locationId", format!("location with id {:?} not found", transaction.location_id));
             }
         }
 
         if errors.is_empty() {
             Ok(())
         } else {
-            Err(AppError::from_validation(errors))
+            let mut error = Error::new("validation errors on transaction");
+            for (k, v) in errors {
+                error = error.extend_with(|_, e| e.set(k, v));
+            }
+            Err(error)
         }
     }
 }
@@ -87,11 +64,9 @@ pub(crate) mod item {
     use crate::model::item::InsertableItem;
 
     pub(crate) async fn validate_sku(
-        context: &Context,
+        context: &AppContext,
         item: &InsertableItem,
-    ) -> Result<(), AppError> {
-        let mut errors = ValidationErrors::new();
-
+    ) -> Result<()> {
         if let Some(sku) = &item.sku {
             let sku_count = sqlx::query!(
                 r#"select count(id) from items where upper(sku) = upper($1)"#,
@@ -99,15 +74,14 @@ pub(crate) mod item {
             )
             .fetch_one(&*context.clients.postgres)
             .await
-            .map_err(AppError::from)?
+            .map_err(Error::from)?
             .count
             .unwrap_or(0);
 
             if sku_count == 0 {
                 Ok(())
             } else {
-                add_error(&mut errors, "uniqueness", "sku is not unique", "sku", sku);
-                Err(AppError::from_validation(errors))
+                Err(Error::new("validation errors on item").extend_with(|_, e| e.set("itemId", format!("sku {:?} not unique", sku))))
             }
         } else {
             Ok(())

@@ -4,58 +4,48 @@
 //! An inventory tracking web application.
 
 #[macro_use]
-extern crate juniper;
-#[macro_use]
 extern crate derive_more;
 
 mod batcher;
 mod db;
-mod error;
 mod graphql;
 mod model;
 mod store;
 
 use std::env;
 use std::sync::Arc;
-use std::time::Duration;
 
 use actix_web::{middleware, http, web, App, Error, HttpRequest, HttpResponse, HttpServer};
+use async_graphql::http::GraphQLPlaygroundConfig;
+use async_graphql_actix_web::{GraphQLRequest, GraphQLResponse, GraphQLSubscription};
 
-use crate::graphql::{Clients, Context};
-
-/// Connection config keep alive interval in seconds.
-const CONFIG_KEEP_ALIVE: u64 = 15;
+use crate::graphql::{AppContext, AppSchema, Clients};
 
 /// The route for the GraphQL playground.
 async fn playground_route() -> Result<HttpResponse, Error> {
-    juniper_actix::playground_handler("/graphql", Some("/subscriptions")).await
+    let source = async_graphql::http::playground_source(GraphQLPlaygroundConfig::new("/graphql").subscription_endpoint("/subscriptions"));
+    Ok(HttpResponse::Ok().content_type("text/html; charset=utf-8").body(source))
 }
 
 /// The route for the GraphQL endpoint.
 async fn graphql_route(
-    req: HttpRequest,
-    payload: web::Payload,
-    context: web::Data<Context>,
-    schema: web::Data<graphql::Schema>,
-) -> Result<HttpResponse, Error> {
-    juniper_actix::graphql_handler(&schema, &context, req, payload).await
+    req: GraphQLRequest,
+    schema: web::Data<AppSchema>,
+) -> GraphQLResponse {
+    schema.execute(req.into_inner()).await.into()
 }
 
 /// The route for the GraphQL subscriptions.
-async fn subscriptions_route(
+async fn subscription_route(
     req: HttpRequest,
     payload: web::Payload,
-    context: web::Data<Context>,
-    schema: web::Data<graphql::Schema>,
+    schema: web::Data<AppSchema>,
 ) -> Result<HttpResponse, Error> {
-    let config = juniper_graphql_ws::ConnectionConfig::new((*context.into_inner()).clone());
-    let config = config.with_keep_alive_interval(Duration::from_secs(CONFIG_KEEP_ALIVE));
-    juniper_actix::subscriptions::subscriptions_handler(req, payload, schema.into_inner(), config)
-        .await
+    GraphQLSubscription::new(async_graphql::Schema::clone(&*schema)).start(&req, payload)
 }
 
 /// Gets the context for the application.
-async fn get_context() -> Context {
+async fn get_context() -> AppContext {
     // create the redis client and db pool, storing them in the context
     let redis = Arc::new(
         store::get_client()
@@ -69,7 +59,7 @@ async fn get_context() -> Context {
     let mut loaders = anymap::Map::new();
     batcher::register_loaders(&clients, &mut loaders);
 
-    Context {
+    AppContext {
         clients,
         loaders: Arc::new(loaders),
     }
@@ -79,11 +69,13 @@ async fn get_context() -> Context {
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let context = get_context().await;
+    let schema = graphql::schema_builder()
+        .data(context)
+        .finish();
 
     HttpServer::new(move || {
         App::new()
-            .app_data(web::Data::new(context.clone()))
-            .app_data(web::Data::new(graphql::schema()))
+            .app_data(web::Data::new(schema.clone()))
             .wrap(middleware::Compress::default())
             .wrap(middleware::Logger::default())
             .wrap(
@@ -98,7 +90,7 @@ async fn main() -> std::io::Result<()> {
                     .route(web::post().to(graphql_route))
                     .route(web::get().to(graphql_route)),
             )
-            .service(web::resource("/subscriptions").route(web::get().to(subscriptions_route)))
+            .service(web::resource("/subscriptions").route(web::get().to(subscription_route)))
             .service(web::resource("/playground").route(web::get().to(playground_route)))
             .default_service(web::route().to(|| HttpResponse::NotFound()))
     })
@@ -122,10 +114,12 @@ mod test {
     macro_rules! test_server {
         () => {{
             let context = get_context().await;
+            let schema = graphql::schema_builder()
+                .data(context)
+                .finish();
             test::init_service(
                 App::new()
-                    .app_data(web::Data::new(context.clone()))
-                    .app_data(web::Data::new(graphql::schema()))
+                    .app_data(web::Data::new(schema.clone()))
                     .service(web::resource("/graphql").route(web::post().to(graphql_route))),
             )
             .await
@@ -143,7 +137,7 @@ mod test {
             }))
             .to_request();
         let resp: serde_json::value::Value = test::call_and_read_body_json(&mut app, req).await;
-        assert_eq!(resp["errors"][0]["extensions"][0]["field"], "name");
+        assert!(!resp["errors"][0]["message"].is_null());
     }
 
     #[actix_rt::test]
@@ -160,7 +154,7 @@ mod test {
                 .to_request();
             resp = test::call_and_read_body_json(&mut app, req).await;
         }
-        assert_eq!(resp["errors"][0]["extensions"][0]["field"], "sku");
+        assert!(!resp["errors"][0]["message"].is_null());
     }
 
     #[actix_rt::test]
@@ -170,7 +164,7 @@ mod test {
             "query": r#"mutation { createTransaction(transaction: { itemId: 0, quantity: 10 }) { id } }"#
         })).to_request();
         let resp: serde_json::value::Value = test::call_and_read_body_json(&mut app, req).await;
-        assert_eq!(resp["errors"][0]["extensions"][0]["field"], "itemId");
+        assert!(!resp["errors"][0]["message"].is_null());
     }
 
     #[actix_rt::test]
@@ -201,7 +195,7 @@ mod test {
             }))
             .to_request();
         let resp: serde_json::value::Value = test::call_and_read_body_json(&mut app, req).await;
-        assert_eq!(resp["errors"][0]["extensions"][0]["field"], "locationId");
+        assert!(!resp["errors"][0]["message"].is_null());
     }
 
     #[actix_rt::test]

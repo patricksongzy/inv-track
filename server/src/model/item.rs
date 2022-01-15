@@ -1,12 +1,11 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 
+use async_graphql::{Error, Result};
 use serde::{Deserialize, Serialize};
-use validator::Validate;
 
 use crate::batcher::id_loader::IdLoader;
-use crate::error::AppError;
-use crate::graphql::{Clients, Context};
+use crate::graphql::{AppContext, Clients};
 use crate::model::modification::{self, ModificationType};
 use crate::model::transaction::Transaction;
 use crate::model::validation;
@@ -20,22 +19,25 @@ use crate::model::validation;
     Copy,
     Clone,
     Debug,
-    GraphQLScalarValue,
     sqlx::Type,
     Serialize,
     Deserialize,
 )]
 #[sqlx(transparent)]
 pub(crate) struct ItemId(i32);
+async_graphql::scalar!(ItemId);
+
 /// The quantity of inventory.
 #[derive(
-    PartialEq, Into, Neg, Copy, Clone, Debug, GraphQLScalarValue, sqlx::Type, Serialize, Deserialize,
+    PartialEq, Into, Neg, Copy, Clone, Debug, sqlx::Type, Serialize, Deserialize,
 )]
 #[sqlx(transparent)]
 pub(crate) struct ItemQuantity(i32);
+async_graphql::scalar!(ItemQuantity);
 
 /// Item model returned by a query in the inventory tracking system.
-#[derive(Debug, Clone, PartialEq, sqlx::FromRow, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, sqlx::FromRow, Serialize, Deserialize, async_graphql::SimpleObject)]
+#[graphql(complex)]
 pub(crate) struct Item {
     id: ItemId,
     sku: Option<String>,
@@ -44,20 +46,19 @@ pub(crate) struct Item {
     description: Option<String>,
 }
 
-/// Item model to insert in the inventory tracking system.
-#[derive(Debug, PartialEq, Validate, Deserialize, GraphQLInputObject)]
-#[graphql(description = "An item to input to the inventory system.")]
+/// Item model to input to the inventory tracking system.
+#[derive(Debug, PartialEq, Deserialize, async_graphql::InputObject)]
 pub(crate) struct InsertableItem {
-    #[validate(length(min = 1, message = "sku must be at least 1 character long"))]
+    #[graphql(validator(min_length = 1))]
     pub(crate) sku: Option<String>,
-    #[validate(length(min = 1, message = "name must be at least 1 character long"))]
+    #[graphql(validator(min_length = 1))]
     name: String,
     supplier: Option<String>,
     description: Option<String>,
 }
 
-/// Gets all items, returning the result, or a field error.
-pub(crate) async fn get_items(context: &Context) -> Result<Vec<Item>, AppError> {
+/// Gets all items, returning the result, or an error error.
+pub(crate) async fn get_items(context: &AppContext) -> Result<Vec<Item>> {
     sqlx::query_as::<_, Item>(
         r#"
         select id, sku, name, supplier, description from items
@@ -65,14 +66,14 @@ pub(crate) async fn get_items(context: &Context) -> Result<Vec<Item>, AppError> 
     )
     .fetch_all(&*context.clients.postgres)
     .await
-    .map_err(AppError::from)
+    .map_err(Error::from)
 }
 
 /// Gets all items with the given ids.
 pub(crate) async fn get_items_by_ids(
     clients: &Clients,
     ids: Vec<ItemId>,
-) -> Result<HashMap<ItemId, Item>, AppError> {
+) -> Result<HashMap<ItemId, Item>> {
     sqlx::query_as::<_, Item>(
         r#"
         select id, sku, name, supplier, description from items
@@ -83,14 +84,14 @@ pub(crate) async fn get_items_by_ids(
     .fetch_all(&*clients.postgres)
     .await
     .map(|items| items.into_iter().map(|item| (item.id, item)).collect())
-    .map_err(AppError::from)
+    .map_err(Error::from)
 }
 
 /// Gets all transactions with the given item ids.
 pub(crate) async fn get_transactions_by_item_ids(
     clients: &Clients,
     ids: Vec<ItemId>,
-) -> Result<HashMap<ItemId, Vec<Transaction>>, AppError> {
+) -> Result<HashMap<ItemId, Vec<Transaction>>> {
     sqlx::query_as::<_, Transaction>(
         r#"
         select id, item_id, location_id, transaction_date, quantity, comment from transactions
@@ -110,14 +111,14 @@ pub(crate) async fn get_transactions_by_item_ids(
         });
         transactions_map
     })
-    .map_err(AppError::from)
+    .map_err(Error::from)
 }
 
 /// Gets the item quantities for items with the given item ids.
 pub(crate) async fn get_quantities_by_item_ids(
     clients: &Clients,
     ids: Vec<ItemId>,
-) -> Result<HashMap<ItemId, ItemQuantity>, AppError> {
+) -> Result<HashMap<ItemId, ItemQuantity>> {
     let results = sqlx::query!(
         r#"
         select item_id, coalesce(sum(quantity), 0) from transactions
@@ -128,7 +129,7 @@ pub(crate) async fn get_quantities_by_item_ids(
     )
     .fetch_all(&*clients.postgres)
     .await
-    .map_err(AppError::from)?;
+    .map_err(Error::from)?;
 
     let mut results_map = HashMap::new();
     for result in results {
@@ -140,8 +141,8 @@ pub(crate) async fn get_quantities_by_item_ids(
     Ok(results_map)
 }
 
-/// Gets an item, given an id, returning the result, or a field error.
-pub(crate) async fn get_item(context: &Context, id: ItemId) -> Result<Item, AppError> {
+/// Gets an item, given an id, returning the result, or an error.
+pub(crate) async fn get_item(context: &AppContext, id: ItemId) -> Result<Item> {
     context
         .loaders
         .get::<IdLoader<ItemId, Item, Clients>>()
@@ -150,10 +151,8 @@ pub(crate) async fn get_item(context: &Context, id: ItemId) -> Result<Item, AppE
         .await
 }
 
-/// Creates an item, given an insertable item, returning the result, or a field error.
-pub(crate) async fn create_item(context: &Context, item: InsertableItem) -> Result<Item, AppError> {
-    item.validate().map_err(AppError::from_validation)?;
-
+/// Creates an item, given an insertable item, returning the result, or an error.
+pub(crate) async fn create_item(context: &AppContext, item: InsertableItem) -> Result<Item> {
     // check that the sku is unique
     validation::item::validate_sku(context, &item).await?;
 
@@ -170,7 +169,7 @@ pub(crate) async fn create_item(context: &Context, item: InsertableItem) -> Resu
     .bind(item.description)
     .fetch_one(&*context.clients.postgres)
     .await
-    .map_err(AppError::from)?;
+    .map_err(Error::from)?;
 
     // publish the created event using redis pubsub and send the created item data
     modification::broadcast(context, "items", ModificationType::Create, &created).await;
@@ -178,13 +177,12 @@ pub(crate) async fn create_item(context: &Context, item: InsertableItem) -> Resu
     Ok(created)
 }
 
-/// Updates an item, given an insertable item, returning the result, or a field error.
+/// Updates an item, given an insertable item, returning the result, or an error.
 pub(crate) async fn update_item(
-    context: &Context,
+    context: &AppContext,
     id: ItemId,
     item: InsertableItem,
-) -> Result<Item, AppError> {
-    item.validate().map_err(AppError::from_validation)?;
+) -> Result<Item, Error> {
     let updated = sqlx::query_as::<_, Item>(
         r#"
         update items
@@ -200,7 +198,7 @@ pub(crate) async fn update_item(
     .bind(id)
     .fetch_one(&*context.clients.postgres)
     .await
-    .map_err(AppError::from)?;
+    .map_err(Error::from)?;
 
     // publish the updated event using redis pubsub and send the item data
     modification::broadcast(context, "items", ModificationType::Update, &updated).await;
@@ -208,8 +206,8 @@ pub(crate) async fn update_item(
     Ok(updated)
 }
 
-/// Deletes an item, given an id, returning the result, or a field error.
-pub(crate) async fn delete_item(context: &Context, id: ItemId) -> Result<Item, AppError> {
+/// Deletes an item, given an id, returning the result, or an error.
+pub(crate) async fn delete_item(context: &AppContext, id: ItemId) -> Result<Item> {
     let deleted = sqlx::query_as::<_, Item>(
         r#"
         delete from items
@@ -220,7 +218,7 @@ pub(crate) async fn delete_item(context: &Context, id: ItemId) -> Result<Item, A
     .bind(id)
     .fetch_one(&*context.clients.postgres)
     .await
-    .map_err(AppError::from)?;
+    .map_err(Error::from)?;
 
     // publish the deleted event using redis pubsub and send the item data
     modification::broadcast(context, "items", ModificationType::Delete, &deleted).await;
@@ -229,36 +227,11 @@ pub(crate) async fn delete_item(context: &Context, id: ItemId) -> Result<Item, A
 }
 
 /// An item in the inventory tracking system.
-#[graphql_object(context = Context)]
+#[async_graphql::ComplexObject]
 impl Item {
-    /// The id of the item.
-    fn id(&self) -> ItemId {
-        self.id
-    }
-
-    /// The stock-keeping unit of the item.
-    fn sku(&self) -> Option<&str> {
-        self.sku.as_deref()
-    }
-
-    /// The name of the item.
-    fn name(&self) -> &str {
-        &self.name
-    }
-
-    /// The supplier of the item.
-    fn supplier(&self) -> Option<&str> {
-        self.supplier.as_deref()
-    }
-
-    /// The description of the item.
-    fn description(&self) -> Option<&str> {
-        self.description.as_deref()
-    }
-
     /// The quantity of the item.
-    async fn quantity(&self, context: &Context) -> ItemQuantity {
-        context
+    async fn quantity(&self, context: &async_graphql::Context<'_>) -> ItemQuantity {
+        context.data_unchecked::<AppContext>()
             .loaders
             .get::<IdLoader<ItemId, ItemQuantity, Clients>>()
             .unwrap()
@@ -268,8 +241,8 @@ impl Item {
     }
 
     /// The transactions of the item.
-    async fn transactions(&self, context: &Context) -> Vec<Transaction> {
-        context
+    async fn transactions(&self, context: &async_graphql::Context<'_>) -> Vec<Transaction> {
+        context.data_unchecked::<AppContext>()
             .loaders
             .get::<IdLoader<ItemId, Vec<Transaction>, Clients>>()
             .unwrap()

@@ -5,17 +5,17 @@ use std::future::Future;
 use std::hash::Hash;
 use std::pin::Pin;
 
+use async_graphql::{Error, ErrorExtensions, Result};
 use dataloader::non_cached::Loader;
 use dataloader::BatchFn;
 
 use crate::batcher;
-use crate::error::AppError;
 
 /// A function which retrieves results by ids and constructs a map for them.
 /// The keys, `K` are mapped to the values, `T`.
 /// The IdMapper takes in some context `C`.
 pub(crate) type IdMapper<K, T, C> =
-    fn(&C, Vec<K>) -> Pin<Box<dyn Future<Output = Result<HashMap<K, T>, AppError>> + Send + '_>>;
+    fn(&C, Vec<K>) -> Pin<Box<dyn Future<Output = Result<HashMap<K, T>>> + Send + '_>>;
 
 /// Handles batched loading of results by ids.
 pub(crate) struct IdBatcher<K, T, C> {
@@ -24,16 +24,16 @@ pub(crate) struct IdBatcher<K, T, C> {
 }
 
 /// Batch loader for results by ids.
-pub(crate) type IdLoader<K, T, C> = Loader<K, Result<T, AppError>, IdBatcher<K, T, C>>;
+pub(crate) type IdLoader<K, T, C> = Loader<K, Result<T>, IdBatcher<K, T, C>>;
 
-#[async_trait]
-impl<K, T, C> BatchFn<K, Result<T, AppError>> for IdBatcher<K, T, C>
+#[async_trait::async_trait]
+impl<K, T, C> BatchFn<K, Result<T>> for IdBatcher<K, T, C>
 where
     K: Eq + Hash + Send + Sync + Copy + Clone + Debug,
     T: Send + Clone,
     C: Send + Sync,
 {
-    async fn load(&mut self, ids: &[K]) -> HashMap<K, Result<T, AppError>> {
+    async fn load(&mut self, ids: &[K]) -> HashMap<K, Result<T>> {
         let mut results_map = HashMap::new();
         // get the results by ids
         match (self.results_by_id)(&self.context, ids.to_vec()).await {
@@ -43,15 +43,7 @@ where
 
                 // for each result not found, create an error
                 ids.iter().for_each(|id| {
-                    if !results_map.contains_key(id) {
-                        results_map.insert(
-                            *id,
-                            Err(AppError::new(
-                                "not found".to_string(),
-                                juniper::Value::null(),
-                            )),
-                        );
-                    }
+                    results_map.entry(*id).or_insert(Err(Error::new("not found").extend_with(|_, e| e.set("id", format!("{:?}", id)))));
                 });
             }
             Err(e) => {
@@ -92,7 +84,7 @@ mod test {
     async fn mapper_fake(
         context: &Option<i32>,
         ids: Vec<i32>,
-    ) -> Result<HashMap<i32, i32>, AppError> {
+    ) -> Result<HashMap<i32, i32>> {
         let mut result = HashMap::new();
         ids.into_iter().for_each(|id| {
             result.insert(id, id + context.unwrap());
@@ -101,8 +93,8 @@ mod test {
     }
 
     /// A fake that returns an error.
-    async fn mapper_fail_fake(_: &Option<i32>, _: Vec<i32>) -> Result<HashMap<i32, i32>, AppError> {
-        Err(AppError::new("error".to_string(), juniper::Value::null()))
+    async fn mapper_fail_fake(_: &Option<i32>, _: Vec<i32>) -> Result<HashMap<i32, i32>> {
+        Err(Error::new("error"))
     }
 
     #[actix_rt::test]
@@ -124,7 +116,7 @@ mod test {
         let f1 = loader.load(5);
         let f2 = loader.load(10);
         let f3 = loader.load(1);
-        let e = AppError::new("error".to_string(), juniper::Value::null());
+        let e = Error::new("error");
         assert_eq!(
             futures::join!(f1, f2, f3),
             (Err(e.clone()), Err(e.clone()), Err(e.clone()))

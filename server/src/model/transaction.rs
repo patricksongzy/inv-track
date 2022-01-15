@@ -1,13 +1,12 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 
+use async_graphql::{Error, Result};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use validator::Validate;
 
 use crate::batcher::id_loader::IdLoader;
-use crate::error::AppError;
-use crate::graphql::{Clients, Context};
+use crate::graphql::{AppContext, Clients};
 use crate::model::item::{self, Item, ItemId, ItemQuantity};
 use crate::model::location::{self, Location, LocationId};
 use crate::model::modification::{self, ModificationType};
@@ -22,16 +21,17 @@ use crate::model::validation;
     Copy,
     Clone,
     Debug,
-    GraphQLScalarValue,
     sqlx::Type,
     Serialize,
     Deserialize,
 )]
 #[sqlx(transparent)]
 pub(crate) struct TransactionId(i32);
+async_graphql::scalar!(TransactionId);
 
 /// Transaction model returned by a query in the inventory tracking system.
-#[derive(Debug, Clone, PartialEq, sqlx::FromRow, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, sqlx::FromRow, Serialize, Deserialize, async_graphql::SimpleObject)]
+#[graphql(complex)]
 pub(crate) struct Transaction {
     id: TransactionId,
     pub(crate) item_id: ItemId,
@@ -41,22 +41,21 @@ pub(crate) struct Transaction {
     comment: Option<String>,
 }
 
-/// Transaction model to insert in the inventory tracking system.
-#[derive(Debug, PartialEq, Validate, Deserialize, GraphQLInputObject)]
-#[graphql(description = "A transaction to input to the inventory system.")]
+/// Transaction model to input to the inventory tracking system.
+#[derive(Debug, PartialEq, Deserialize, async_graphql::InputObject)]
 pub(crate) struct InsertableTransaction {
     #[serde(rename = "itemId")]
     pub(crate) item_id: ItemId,
     #[serde(rename = "locationId")]
     pub(crate) location_id: Option<LocationId>,
-    #[graphql(description = "The date in RFC 3339 format.")]
+    /// The date in RFC 3339 format.
     transaction_date: Option<DateTime<Utc>>,
     quantity: ItemQuantity,
     comment: Option<String>,
 }
 
 /// Gets all transactions, returning the result, or a field error.
-pub(crate) async fn get_transactions(context: &Context) -> Result<Vec<Transaction>, AppError> {
+pub(crate) async fn get_transactions(context: &AppContext) -> Result<Vec<Transaction>> {
     sqlx::query_as::<_, Transaction>(
         r#"
         select id, item_id, location_id, transaction_date, quantity, comment from transactions
@@ -64,14 +63,14 @@ pub(crate) async fn get_transactions(context: &Context) -> Result<Vec<Transactio
     )
     .fetch_all(&*context.clients.postgres)
     .await
-    .map_err(AppError::from)
+    .map_err(Error::from)
 }
 
 /// Gets all transactions with the given ids.
 pub(crate) async fn get_transactions_by_ids(
     clients: &Clients,
     ids: Vec<TransactionId>,
-) -> Result<HashMap<TransactionId, Transaction>, AppError> {
+) -> Result<HashMap<TransactionId, Transaction>> {
     sqlx::query_as::<_, Transaction>(
         r#"
         select id, item_id, location_id, transaction_date, quantity, comment from transactions
@@ -87,14 +86,14 @@ pub(crate) async fn get_transactions_by_ids(
             .map(|transaction| (transaction.id, transaction))
             .collect()
     })
-    .map_err(AppError::from)
+    .map_err(Error::from)
 }
 
 /// Gets an transaction, given an id, returning the result, or a field error.
 pub(crate) async fn get_transaction(
-    context: &Context,
+    context: &AppContext,
     id: TransactionId,
-) -> Result<Transaction, AppError> {
+) -> Result<Transaction> {
     context
         .loaders
         .get::<IdLoader<TransactionId, Transaction, Clients>>()
@@ -105,11 +104,9 @@ pub(crate) async fn get_transaction(
 
 /// Creates an transaction, given an insertable transaction, returning the result, or a field error.
 pub(crate) async fn create_transaction(
-    context: &Context,
+    context: &AppContext,
     transaction: InsertableTransaction,
-) -> Result<Transaction, AppError> {
-    transaction.validate().map_err(AppError::from_validation)?;
-
+) -> Result<Transaction> {
     // check that the item and location exist
     validation::transaction::validate_ids(context, &transaction).await?;
 
@@ -127,7 +124,7 @@ pub(crate) async fn create_transaction(
     .bind(transaction.comment)
     .fetch_one(&*context.clients.postgres)
     .await
-    .map_err(AppError::from)?;
+    .map_err(Error::from)?;
 
     // publish the created event using redis pubsub and send the created transaction data
     created.broadcast_update(context, ModificationType::Create).await;
@@ -137,12 +134,10 @@ pub(crate) async fn create_transaction(
 
 /// Updates an transaction, given an insertable transaction, returning the result, or a field error.
 pub(crate) async fn update_transaction(
-    context: &Context,
+    context: &AppContext,
     id: TransactionId,
     transaction: InsertableTransaction,
-) -> Result<Transaction, AppError> {
-    transaction.validate().map_err(AppError::from_validation)?;
-
+) -> Result<Transaction> {
     // check that the item and location exist
     validation::transaction::validate_ids(context, &transaction).await?;
 
@@ -162,7 +157,7 @@ pub(crate) async fn update_transaction(
     .bind(id)
     .fetch_one(&*context.clients.postgres)
     .await
-    .map_err(AppError::from)?;
+    .map_err(Error::from)?;
 
     // publish the deleted event using redis pubsub and send the transaction data
     updated.broadcast_update(context, ModificationType::Update).await;
@@ -172,9 +167,9 @@ pub(crate) async fn update_transaction(
 
 /// Deletes an transaction, given an id, returning the result, or a field error.
 pub(crate) async fn delete_transaction(
-    context: &Context,
+    context: &AppContext,
     id: TransactionId,
-) -> Result<Transaction, AppError> {
+) -> Result<Transaction> {
     let deleted = sqlx::query_as::<_, Transaction>(
         r#"
         delete from transactions
@@ -185,7 +180,7 @@ pub(crate) async fn delete_transaction(
     .bind(id)
     .fetch_one(&*context.clients.postgres)
     .await
-    .map_err(AppError::from)?;
+    .map_err(Error::from)?;
 
     // publish the deleted event using redis pubsub and send the transaction data
     deleted.broadcast_update(context, ModificationType::Delete).await;
@@ -194,20 +189,20 @@ pub(crate) async fn delete_transaction(
 }
 
 impl Transaction {
-    async fn get_item(&self, context: &Context) -> Option<Item> {
+    async fn get_item(&self, context: &AppContext) -> Option<Item> {
         item::get_item(context, self.item_id)
             .await
             .ok()
     }
 
-    async fn get_location(&self, context: &Context) -> Option<Location> {
+    async fn get_location(&self, context: &AppContext) -> Option<Location> {
         match self.location_id {
             Some(location_id) => location::get_location(context, location_id).await.ok(),
             None => None,
         }
     }
 
-    async fn broadcast_update(&self, context: &Context, modification: ModificationType) {
+    async fn broadcast_update(&self, context: &AppContext, modification: ModificationType) {
         // publish the event using redis pubsub and send the transaction data
         modification::broadcast(context, "transactions", modification, self).await;
         if let Some(item) = self.get_item(context).await {
@@ -220,36 +215,16 @@ impl Transaction {
 }
 
 /// An transaction in the inventory tracking system.
-#[graphql_object(context = Context)]
+#[async_graphql::ComplexObject]
 impl Transaction {
-    /// The id of the transaction.
-    fn id(&self) -> TransactionId {
-        self.id
-    }
-
     /// The item of the transaction.
-    async fn item(&self, context: &Context) -> Item {
-        self.get_item(context).await
+    async fn item(&self, context: &async_graphql::Context<'_>) -> Item {
+        self.get_item(context.data_unchecked::<AppContext>()).await
             .expect("dangling transaction has no item")
     }
 
     /// The location of the transaction.
-    async fn location(&self, context: &Context) -> Option<Location> {
-        self.get_location(context).await
-    }
-
-    /// The date of the transaction.
-    fn transaction_date(&self) -> Option<DateTime<Utc>> {
-        self.transaction_date
-    }
-
-    /// The change in quantity of items of the transaction.
-    fn quantity(&self) -> ItemQuantity {
-        self.quantity
-    }
-
-    /// The comment of the transaction.
-    fn comment(&self) -> Option<&str> {
-        self.comment.as_deref()
+    async fn location(&self, context: &async_graphql::Context<'_>) -> Option<Location> {
+        self.get_location(context.data_unchecked::<AppContext>()).await
     }
 }

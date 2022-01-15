@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
@@ -35,6 +36,7 @@ pub(crate) struct Transaction {
     id: TransactionId,
     pub(crate) item_id: ItemId,
     pub(crate) location_id: Option<LocationId>,
+    transaction_date: Option<DateTime<Utc>>,
     quantity: ItemQuantity,
     comment: Option<String>,
 }
@@ -47,6 +49,8 @@ pub(crate) struct InsertableTransaction {
     pub(crate) item_id: ItemId,
     #[serde(rename = "locationId")]
     pub(crate) location_id: Option<LocationId>,
+    #[graphql(description = "The date in RFC 3339 format.")]
+    transaction_date: Option<DateTime<Utc>>,
     quantity: ItemQuantity,
     comment: Option<String>,
 }
@@ -55,7 +59,7 @@ pub(crate) struct InsertableTransaction {
 pub(crate) async fn get_transactions(context: &Context) -> Result<Vec<Transaction>, AppError> {
     sqlx::query_as::<_, Transaction>(
         r#"
-        select id, item_id, location_id, quantity, comment from transactions
+        select id, item_id, location_id, transaction_date, quantity, comment from transactions
     "#,
     )
     .fetch_all(&*context.clients.postgres)
@@ -70,7 +74,7 @@ pub(crate) async fn get_transactions_by_ids(
 ) -> Result<HashMap<TransactionId, Transaction>, AppError> {
     sqlx::query_as::<_, Transaction>(
         r#"
-        select id, item_id, location_id, quantity, comment from transactions
+        select id, item_id, location_id, transaction_date, quantity, comment from transactions
         where id = any($1)
     "#,
     )
@@ -111,13 +115,14 @@ pub(crate) async fn create_transaction(
 
     let result = sqlx::query_as::<_, Transaction>(
         r#"
-        insert into transactions (item_id, location_id, quantity, comment)
-        values ($1, $2, $3, $4)
-        returning id, item_id, location_id, quantity, comment
+        insert into transactions (item_id, location_id, transaction_date, quantity, comment)
+        values ($1, $2, $3, $4, $5)
+        returning id, item_id, location_id, transaction_date, quantity, comment
     "#,
     )
     .bind(transaction.item_id)
     .bind(transaction.location_id)
+    .bind(transaction.transaction_date)
     .bind(transaction.quantity)
     .bind(transaction.comment)
     .fetch_one(&*context.clients.postgres)
@@ -144,13 +149,14 @@ pub(crate) async fn update_transaction(
     let result = sqlx::query_as::<_, Transaction>(
         r#"
         update transactions
-        set item_id = $1, location_id = $2, quantity = $3, comment = $4
-        where id = $5
+        set item_id = $1, location_id = $2, quantity = $3, transaction_date = $4, comment = $5
+        where id = $6
         returning id, item_id, location_id, quantity, comment
     "#,
     )
     .bind(transaction.item_id)
     .bind(transaction.location_id)
+    .bind(transaction.transaction_date)
     .bind(transaction.quantity)
     .bind(transaction.comment)
     .bind(id)
@@ -173,7 +179,7 @@ pub(crate) async fn delete_transaction(
         r#"
         delete from transactions
         where id = $1
-        returning id, item_id, location_id, quantity, comment
+        returning id, item_id, location_id, transaction_date, quantity, comment
     "#,
     )
     .bind(id)
@@ -208,6 +214,11 @@ impl Transaction {
             Some(location_id) => location::get_location(context, location_id).await.ok(),
             None => None,
         }
+    }
+
+    /// The date of the transaction.
+    fn transaction_date(&self) -> Option<DateTime<Utc>> {
+        self.transaction_date
     }
 
     /// The change in quantity of items of the transaction.

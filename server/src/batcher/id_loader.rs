@@ -15,10 +15,7 @@ use crate::error::AppError;
 /// The keys, `K` are mapped to the values, `T`.
 /// The IdMapper takes in some context `C`.
 pub(crate) type IdMapper<K, T, C> =
-    fn(
-        &C,
-        Vec<K>,
-    ) -> Pin<Box<dyn Future<Output = Result<HashMap<K, T>, AppError>> + Send + '_>>;
+    fn(&C, Vec<K>) -> Pin<Box<dyn Future<Output = Result<HashMap<K, T>, AppError>> + Send + '_>>;
 
 /// Handles batched loading of results by ids.
 pub(crate) struct IdBatcher<K, T, C> {
@@ -70,7 +67,10 @@ where
 }
 
 /// Gets an id loader with the given mapping function.
-pub(crate) fn get_loader<K, T, C>(context: &C, results_by_id: IdMapper<K, T, C>) -> IdLoader<K, T, C>
+pub(crate) fn get_loader<K, T, C>(
+    context: &C,
+    results_by_id: IdMapper<K, T, C>,
+) -> IdLoader<K, T, C>
 where
     K: Eq + Hash + Send + Sync + Copy + Clone + Debug,
     T: Send + Clone,
@@ -89,7 +89,10 @@ mod test {
     use super::*;
 
     /// A fake that adds ids to the context.
-    async fn mapper_fake(context: &Option<i32>, ids: Vec<i32>) -> Result<HashMap<i32, i32>, AppError> {
+    async fn mapper_fake(
+        context: &Option<i32>,
+        ids: Vec<i32>,
+    ) -> Result<HashMap<i32, i32>, AppError> {
         let mut result = HashMap::new();
         ids.into_iter().for_each(|id| {
             result.insert(id, id + context.unwrap());
@@ -105,7 +108,7 @@ mod test {
     #[actix_rt::test]
     async fn test_mapper() {
         let context = Some(1);
-        let loader = get_loader(&context, |clients, ids| { Box::pin(mapper_fake(clients, ids)) });
+        let loader = get_loader(&context, |clients, ids| Box::pin(mapper_fake(clients, ids)));
         let f1 = loader.load(5);
         let f2 = loader.load(10);
         let f3 = loader.load(1);
@@ -115,11 +118,16 @@ mod test {
     #[actix_rt::test]
     async fn test_mapper_fail() {
         let context = Some(1);
-        let loader = get_loader(&context, |clients, ids| { Box::pin(mapper_fail_fake(clients, ids)) });
+        let loader = get_loader(&context, |clients, ids| {
+            Box::pin(mapper_fail_fake(clients, ids))
+        });
         let f1 = loader.load(5);
         let f2 = loader.load(10);
         let f3 = loader.load(1);
         let e = AppError::new("error".to_string(), juniper::Value::null());
-        assert_eq!(futures::join!(f1, f2, f3), (Err(e.clone()), Err(e.clone()), Err(e.clone())));
+        assert_eq!(
+            futures::join!(f1, f2, f3),
+            (Err(e.clone()), Err(e.clone()), Err(e.clone()))
+        );
     }
 }

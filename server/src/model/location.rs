@@ -87,7 +87,7 @@ pub(crate) async fn get_transactions_by_location_ids(
 ) -> Result<HashMap<LocationId, Vec<Transaction>>, AppError> {
     sqlx::query_as::<_, Transaction>(
         r#"
-        select id, item_id, location_id, quantity, comment from transactions
+        select id, item_id, location_id, transaction_date, quantity, comment from transactions
         where location_id = any($1)
     "#,
     )

@@ -54,6 +54,7 @@ async fn subscriptions_route(
         .await
 }
 
+/// Gets the context for the application.
 async fn get_context() -> Context {
     // create the redis client and db pool, storing them in the context
     let redis = Arc::new(
@@ -111,25 +112,28 @@ mod test {
 
     /// Macro to set up the test server.
     macro_rules! test_server {
-        () => {
-            {
-                let context = get_context().await;
-                test::init_service(
-                    App::new()
-                        .app_data(web::Data::new(context.clone()))
-                        .app_data(web::Data::new(graphql::schema()))
-                        .service(web::resource("/graphql").route(web::post().to(graphql_route)))
-                ).await
-            }
-        };
+        () => {{
+            let context = get_context().await;
+            test::init_service(
+                App::new()
+                    .app_data(web::Data::new(context.clone()))
+                    .app_data(web::Data::new(graphql::schema()))
+                    .service(web::resource("/graphql").route(web::post().to(graphql_route))),
+            )
+            .await
+        }};
     }
 
     #[actix_rt::test]
     async fn test_empty_item_name() {
         let mut app = test_server!();
-        let req = test::TestRequest::post().uri("/graphql").insert_header(http::header::ContentType::json()).set_json(serde_json::json!({
-            "query": r#"mutation { createItem(item: { name: "" }) { id } }"#
-        })).to_request();
+        let req = test::TestRequest::post()
+            .uri("/graphql")
+            .insert_header(http::header::ContentType::json())
+            .set_json(serde_json::json!({
+                "query": r#"mutation { createItem(item: { name: "" }) { id } }"#
+            }))
+            .to_request();
         let resp: serde_json::value::Value = test::call_and_read_body_json(&mut app, req).await;
         assert_eq!(resp["errors"][0]["extensions"][0]["field"], "name");
     }
@@ -139,9 +143,13 @@ mod test {
         let mut app = test_server!();
         let mut resp: serde_json::value::Value = serde_json::json!({});
         for _ in 0..2 {
-            let req = test::TestRequest::post().uri("/graphql").insert_header(http::header::ContentType::json()).set_json(serde_json::json!({
-                "query": r#"mutation { createItem(item: { name: "name", sku: "ABC" }) { id } }"#
-            })).to_request();
+            let req = test::TestRequest::post()
+                .uri("/graphql")
+                .insert_header(http::header::ContentType::json())
+                .set_json(serde_json::json!({
+                    "query": r#"mutation { createItem(item: { name: "name", sku: "ABC" }) { id } }"#
+                }))
+                .to_request();
             resp = test::call_and_read_body_json(&mut app, req).await;
         }
         assert_eq!(resp["errors"][0]["extensions"][0]["field"], "sku");
@@ -161,15 +169,29 @@ mod test {
     async fn test_nonexistent_transaction_location() {
         let mut app = test_server!();
         // create a test item
-        let req = test::TestRequest::post().uri("/graphql").insert_header(http::header::ContentType::json()).set_json(serde_json::json!({
-            "query": r#"mutation { createItem(item: { name: "TestItem" }) { id } }"#
-        })).to_request();
+        let req = test::TestRequest::post()
+            .uri("/graphql")
+            .insert_header(http::header::ContentType::json())
+            .set_json(serde_json::json!({
+                "query": r#"mutation { createItem(item: { name: "TestItem" }) { id } }"#
+            }))
+            .to_request();
         let resp: serde_json::value::Value = test::call_and_read_body_json(&mut app, req).await;
         let id = resp["data"]["createItem"]["id"].as_i64().unwrap();
 
-        let req = test::TestRequest::post().uri("/graphql").insert_header(http::header::ContentType::json()).set_json(serde_json::json!({
-            "query": format!("{}{}{}", r#"mutation { createTransaction(transaction: { itemId: "#, id, r#", locationId: 0, quantity: 10 }) { id } }"#)
-        })).to_request();
+        let req = test::TestRequest::post()
+            .uri("/graphql")
+            .insert_header(http::header::ContentType::json())
+            .set_json(serde_json::json!({
+                "query":
+                    format!(
+                        "{}{}{}",
+                        r#"mutation { createTransaction(transaction: { itemId: "#,
+                        id,
+                        r#", locationId: 0, quantity: 10 }) { id } }"#
+                    )
+            }))
+            .to_request();
         let resp: serde_json::value::Value = test::call_and_read_body_json(&mut app, req).await;
         assert_eq!(resp["errors"][0]["extensions"][0]["field"], "locationId");
     }
@@ -178,51 +200,107 @@ mod test {
     async fn test_delete_location_nulls_and_delete_item_deletes_transaction() {
         let mut app = test_server!();
         // create a test item
-        let req = test::TestRequest::post().uri("/graphql").insert_header(http::header::ContentType::json()).set_json(serde_json::json!({
-            "query": r#"mutation { createItem(item: { name: "TestItem" }) { id } }"#
-        })).to_request();
+        let req = test::TestRequest::post()
+            .uri("/graphql")
+            .insert_header(http::header::ContentType::json())
+            .set_json(serde_json::json!({
+                "query": r#"mutation { createItem(item: { name: "TestItem" }) { id } }"#
+            }))
+            .to_request();
         let resp: serde_json::value::Value = test::call_and_read_body_json(&mut app, req).await;
         let item_id = resp["data"]["createItem"]["id"].as_i64().unwrap();
 
         // create a test location
-        let req = test::TestRequest::post().uri("/graphql").insert_header(http::header::ContentType::json()).set_json(serde_json::json!({
-            "query": r#"mutation { createLocation(location: { name: "Toronto" }) { id } }"#
-        })).to_request();
+        let req = test::TestRequest::post()
+            .uri("/graphql")
+            .insert_header(http::header::ContentType::json())
+            .set_json(serde_json::json!({
+                "query": r#"mutation { createLocation(location: { name: "Toronto" }) { id } }"#
+            }))
+            .to_request();
         let resp: serde_json::value::Value = test::call_and_read_body_json(&mut app, req).await;
         let location_id = resp["data"]["createLocation"]["id"].as_i64().unwrap();
 
         // create a test transaction
-        let req = test::TestRequest::post().uri("/graphql").insert_header(http::header::ContentType::json()).set_json(serde_json::json!({
-            "query": format!("{}{}{}", r#"mutation { createTransaction(transaction: { itemId: "#, item_id, r#", quantity: 10 }) { id } }"#)
-        })).to_request();
+        let req = test::TestRequest::post()
+            .uri("/graphql")
+            .insert_header(http::header::ContentType::json())
+            .set_json(serde_json::json!({
+                "query":
+                    format!(
+                        "{}{}{}",
+                        r#"mutation { createTransaction(transaction: { itemId: "#,
+                        item_id,
+                        r#", quantity: 10 }) { id } }"#
+                    )
+            }))
+            .to_request();
         let resp: serde_json::value::Value = test::call_and_read_body_json(&mut app, req).await;
         let transaction_id = resp["data"]["createTransaction"]["id"].as_i64().unwrap();
 
         // delete the test location
-        let req = test::TestRequest::post().uri("/graphql").insert_header(http::header::ContentType::json()).set_json(serde_json::json!({
-            "query": format!("{}{}{}", r#"mutation { deleteLocation(id: "#, location_id, r#" ) { id } }"#)
-        })).to_request();
+        let req = test::TestRequest::post()
+            .uri("/graphql")
+            .insert_header(http::header::ContentType::json())
+            .set_json(serde_json::json!({
+                "query":
+                    format!(
+                        "{}{}{}",
+                        r#"mutation { deleteLocation(id: "#, location_id, r#" ) { id } }"#
+                    )
+            }))
+            .to_request();
         let resp: serde_json::value::Value = test::call_and_read_body_json(&mut app, req).await;
-        assert_eq!(resp["data"]["deleteLocation"]["id"].as_i64().unwrap(), location_id);
+        assert_eq!(
+            resp["data"]["deleteLocation"]["id"].as_i64().unwrap(),
+            location_id
+        );
 
         // check that the test transaction location is null
-        let req = test::TestRequest::post().uri("/graphql").insert_header(http::header::ContentType::json()).set_json(serde_json::json!({
-            "query": format!("{}{}{}", r#"{ transaction(id: "#, transaction_id, r#") { location { id } } }"#)
-        })).to_request();
+        let req = test::TestRequest::post()
+            .uri("/graphql")
+            .insert_header(http::header::ContentType::json())
+            .set_json(serde_json::json!({
+                "query":
+                    format!(
+                        "{}{}{}",
+                        r#"{ transaction(id: "#, transaction_id, r#") { location { id } } }"#
+                    )
+            }))
+            .to_request();
         let resp: serde_json::value::Value = test::call_and_read_body_json(&mut app, req).await;
-        assert_eq!(resp["data"]["transaction"]["location"], serde_json::json!(null));
+        assert_eq!(
+            resp["data"]["transaction"]["location"],
+            serde_json::json!(null)
+        );
 
         // delete the test item
-        let req = test::TestRequest::post().uri("/graphql").insert_header(http::header::ContentType::json()).set_json(serde_json::json!({
-            "query": format!("{}{}{}", r#"mutation { deleteItem(id: "#, item_id, r#" ) { id } }"#)
-        })).to_request();
+        let req = test::TestRequest::post()
+            .uri("/graphql")
+            .insert_header(http::header::ContentType::json())
+            .set_json(serde_json::json!({
+                "query":
+                    format!(
+                        "{}{}{}",
+                        r#"mutation { deleteItem(id: "#, item_id, r#" ) { id } }"#
+                    )
+            }))
+            .to_request();
         let resp: serde_json::value::Value = test::call_and_read_body_json(&mut app, req).await;
         assert_eq!(resp["data"]["deleteItem"]["id"].as_i64().unwrap(), item_id);
 
         // check that the test transaction was deleted
-        let req = test::TestRequest::post().uri("/graphql").insert_header(http::header::ContentType::json()).set_json(serde_json::json!({
-            "query": format!("{}{}{}", r#"{ transaction(id: "#, transaction_id, r#") { id } }"#)
-        })).to_request();
+        let req = test::TestRequest::post()
+            .uri("/graphql")
+            .insert_header(http::header::ContentType::json())
+            .set_json(serde_json::json!({
+                "query":
+                    format!(
+                        "{}{}{}",
+                        r#"{ transaction(id: "#, transaction_id, r#") { id } }"#
+                    )
+            }))
+            .to_request();
         let resp: serde_json::value::Value = test::call_and_read_body_json(&mut app, req).await;
         assert_eq!(resp["errors"][0]["message"].as_str().unwrap(), "not found");
     }

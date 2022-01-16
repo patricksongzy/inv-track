@@ -47,7 +47,7 @@
               <router-link
                 :to="`/transactions/${transaction.id}`"
                 class="button is-link"
-                >Transaction</router-link
+                >View Transaction</router-link
               >
             </td>
           </tr>

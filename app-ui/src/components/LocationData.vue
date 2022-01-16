@@ -205,13 +205,17 @@ export default {
       const transactions = this.location.transactions;
       let items = new Map();
       for (const transaction of transactions) {
-        items.set(transaction.item.id, {
-          name: transaction.item.name,
-          sku: transaction.item.name,
-          quantity:
-            items[transaction.item.id]?.quantity ?? 0 + transaction.quantity,
-        });
+        if (items.has(transaction.item.id)) {
+          items.get(transaction.item.id).quantity += transaction.quantity;
+        } else {
+          items.set(transaction.item.id, {
+            name: transaction.item.name,
+            sku: transaction.item.name,
+            quantity: transaction.quantity,
+          });
+        }
       }
+      console.log(transactions);
       return Array.from(items);
     },
   },

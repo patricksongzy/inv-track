@@ -1,12 +1,28 @@
 <template>
-  <div>
-    <router-link to="/">Home</router-link>
-    <router-link to="/items">Items</router-link>
-    <router-link to="/locations">Locations</router-link>
-    <router-link to="/transactions">Transactions</router-link>
-  </div>
+  <nav class="navbar" role="navigation" aria-label="main navigation">
+    <div class="navbar-brand">
+      <router-link to="/" class="navbar-item"
+        ><strong>Inv-Track</strong></router-link
+      >
+      <router-link to="/items" class="navbar-item">Items</router-link>
+      <router-link to="/locations" class="navbar-item">Locations</router-link>
+      <router-link to="/transactions" class="navbar-item"
+        >Transactions</router-link
+      >
+    </div>
+    <div class="navbar-end">
+      <a v-bind:href="`http://${api_url}/playground`" class="navbar-item"
+        >GraphQL Playground</a
+      >
+    </div>
+  </nav>
 </template>
 <script>
 export default {
+  data() {
+    return {
+      api_url: process.env.VUE_APP_API_ADDRESS,
+    };
+  },
 };
 </script>

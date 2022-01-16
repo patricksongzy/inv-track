@@ -1,12 +1,24 @@
 <template>
-  <div id="app">
-    <nav-bar />
-    <router-view />
-  </div>
+  <section class="section">
+    <div id="app" class="container">
+      <nav-bar />
+      <section class="section">
+        <div class="container">
+          <router-view />
+        </div>
+      </section>
+    </div>
+  </section>
 </template>
 
 <script>
-import { createClient, defaultExchanges, provideClient, subscriptionExchange } from '@urql/vue';
+import 'bulma/css/bulma.css';
+import {
+  createClient,
+  defaultExchanges,
+  provideClient,
+  subscriptionExchange,
+} from '@urql/vue';
 import { createClient as createWsClient } from 'graphql-ws';
 
 import NavBar from './components/NavBar.vue';
@@ -18,11 +30,11 @@ export default {
   },
   setup() {
     const wsClient = createWsClient({
-      url: `ws://localhost:8000/subscriptions`,
+      url: `ws://${process.env.VUE_APP_API_ADDRESS}/subscriptions`,
     });
 
     const client = createClient({
-      url: `http://localhost:8000/graphql`,
+      url: `http://${process.env.VUE_APP_API_ADDRESS}/graphql`,
       exchanges: [
         ...defaultExchanges,
         subscriptionExchange({
@@ -39,14 +51,3 @@ export default {
   },
 };
 </script>
-
-<style>
-#app {
-  font-family: Avenir, Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-align: center;
-  color: #2c3e50;
-  margin-top: 60px;
-}
-</style>

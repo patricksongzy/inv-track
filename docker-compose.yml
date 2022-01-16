@@ -4,6 +4,8 @@ services:
     build: ./app-ui
     ports:
       - "${VUE_PORT}:${VUE_PORT}"
+    environment:
+      VUE_APP_API_ADDRESS: ${VUE_APP_API_ADDRESS}
     depends_on:
       - server
     volumes:

@@ -1,0 +1,21 @@
+# install dependencies
+FROM rustlang/rust:nightly as builder
+USER root
+WORKDIR /usr/src/app/server
+RUN cargo init
+COPY ./Cargo.toml ./Cargo.lock ./
+# RUN cargo install sqlx-cli --no-default-features --features native-tls,postgres
+
+# install server
+COPY ./src ./
+# COPY ./migrations ./
+RUN cargo install --path .
+
+# run server
+FROM debian:buster-slim AS runtime
+WORKDIR /usr/local/bin
+# COPY --from=builder /usr/local/cargo/bin/sqlx .
+COPY --from=builder /usr/local/cargo/bin/inv-track .
+
+EXPOSE ${PORT}
+CMD [sh, -c, "./inv-track"]

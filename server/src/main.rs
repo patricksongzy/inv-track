@@ -96,7 +96,7 @@ async fn main() -> std::io::Result<()> {
     .bind(format!(
         "{}:{}",
         env::var("ACTIX_ADDRESS").expect("ACTIX_ADDRESS must be set"),
-        env::var("ACTIX_PORT").expect("ACTIX_PORT must be set")
+        env::var("PORT").expect("PORT must be set")
     ))?
     .run()
     .await

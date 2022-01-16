@@ -5,19 +5,20 @@ services:
     ports:
       - "${VUE_PORT}:${VUE_PORT}"
     environment:
+      PORT: ${VUE_PORT}
       VUE_APP_API_ADDRESS: ${VUE_APP_API_ADDRESS}
     depends_on:
       - server
     volumes:
       - ./app-ui:/usr/src/app/app-ui
-    command: [sh, -c, "npm run serve"]
+    command: [sh, -c, "npm run --silent serve"]
   server:
     build: ./server
     ports:
       - "${ACTIX_PORT}:${ACTIX_PORT}"
     environment:
       ACTIX_ADDRESS: ${ACTIX_ADDRESS}
-      ACTIX_PORT: ${ACTIX_PORT}
+      PORT: ${ACTIX_PORT}
       REDIS_ADDRESS: redis://redis:6379/
       DATABASE_MAX_CONNECTIONS: ${DATABASE_MAX_CONNECTIONS}
       DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db/${DATABASE_NAME}

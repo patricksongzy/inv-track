@@ -1,14 +1,18 @@
 # inv-track
 * a simple inventory tracking web application with
-  * GraphQL queries, mutations and subscriptions
+  * GraphQL queries, mutations and subscriptions (with Redis PubSub)
   * batching dataloaders (N+1 problem)
+  * docker compose for development, test and production
+* see [Extensibility](#extensibility) for future improvements
+* feature: create locations and assign inventory
 
 ## Running
-* **note** docker compose v3 is required
+* **note** docker compose v3 is required, but this is the **only** dependency to serve this project (because docker <3)
 
 development: `docker compose up`\
 integration tests: `docker compose -f docker-compose.yml -f integration-test.yml up`\
-production: `docker compose -f docker-compose.yml -f production.yml up`
+optimized: `docker compose -f docker-compose.yml -f optimized.yml up`
+* for production, use the multi-stage build instead located in `./server/Dockerfile.production`
 
 ## Using
 * using the playground link allows creating GraphQL requests and receiving responses
@@ -39,6 +43,9 @@ production: `docker compose -f docker-compose.yml -f production.yml up`
 * subscriptions for real-time data updates
 * endpoint is `/subscriptions`
 * source code in `/server/src/graphql/subscription.rs`
+## Transactions
+* a transaction is a change in quantity for an item (optionally at a location)
+* note if we were to add shipments, they would comprise multiple transactions
 
 ## Tetsting
 * tests are located in `/server/src/main.rs` and `/server/src/batcher/id_loader.rs`
@@ -48,7 +55,6 @@ production: `docker compose -f docker-compose.yml -f production.yml up`
 * add query complexity and depth limits (<https://async-graphql.github.io/async-graphql/en/depth_and_complexity.html>)
 * use SeaORM instead of SQLx (not an ORM)
   * used SQLx since it was interesting to write queries out instead of using an ORM language
-* add multi stage docker builds to trim down on image sizes
 * we explicitly choose to allow for negative quantities
   * in the future, warnings can be added to the response
 * use interfaces to return errors and make errors more up-to-spec

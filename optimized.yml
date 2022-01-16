@@ -1,0 +1,12 @@
+version: '3.8'
+services:
+  ui:
+    command: [sh, -c, "npm run --silent production"]
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile.production
+    restart: on-failure
+    command: [sh, -c, "/usr/local/bin/sqlx migrate run && /usr/local/bin/server"]
+  db:
+    restart: on-failure

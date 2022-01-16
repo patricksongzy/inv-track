@@ -29,5 +29,9 @@ pub(crate) type AppSchema = Schema<RootQuery, RootMutation, RootSubscription>;
 
 /// Returns a created schema for the application.
 pub(crate) fn schema_builder() -> SchemaBuilder<RootQuery, RootMutation, RootSubscription> {
-    Schema::build(RootQuery::default(), RootMutation::default(), RootSubscription::default())
+    Schema::build(
+        RootQuery::default(),
+        RootMutation::default(),
+        RootSubscription::default(),
+    )
 }

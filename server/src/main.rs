@@ -15,7 +15,7 @@ mod store;
 use std::env;
 use std::sync::Arc;
 
-use actix_web::{middleware, http, web, App, Error, HttpRequest, HttpResponse, HttpServer};
+use actix_web::{http, middleware, web, App, Error, HttpRequest, HttpResponse, HttpServer};
 use async_graphql::http::GraphQLPlaygroundConfig;
 use async_graphql_actix_web::{GraphQLRequest, GraphQLResponse, GraphQLSubscription};
 
@@ -23,15 +23,16 @@ use crate::graphql::{AppContext, AppSchema, Clients};
 
 /// The route for the GraphQL playground.
 async fn playground_route() -> Result<HttpResponse, Error> {
-    let source = async_graphql::http::playground_source(GraphQLPlaygroundConfig::new("/graphql").subscription_endpoint("/subscriptions"));
-    Ok(HttpResponse::Ok().content_type("text/html; charset=utf-8").body(source))
+    let source = async_graphql::http::playground_source(
+        GraphQLPlaygroundConfig::new("/graphql").subscription_endpoint("/subscriptions"),
+    );
+    Ok(HttpResponse::Ok()
+        .content_type("text/html; charset=utf-8")
+        .body(source))
 }
 
 /// The route for the GraphQL endpoint.
-async fn graphql_route(
-    req: GraphQLRequest,
-    schema: web::Data<AppSchema>,
-) -> GraphQLResponse {
+async fn graphql_route(req: GraphQLRequest, schema: web::Data<AppSchema>) -> GraphQLResponse {
     schema.execute(req.into_inner()).await.into()
 }
 
@@ -69,9 +70,7 @@ async fn get_context() -> AppContext {
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let context = get_context().await;
-    let schema = graphql::schema_builder()
-        .data(context)
-        .finish();
+    let schema = graphql::schema_builder().data(context).finish();
 
     HttpServer::new(move || {
         App::new()
@@ -83,7 +82,7 @@ async fn main() -> std::io::Result<()> {
                     .allow_any_origin()
                     .allowed_methods(vec!["POST", "GET"])
                     .allowed_headers(vec![http::header::ACCEPT, http::header::CONTENT_TYPE])
-                    .max_age(3600)
+                    .max_age(3600),
             )
             .service(
                 web::resource("/graphql")
@@ -92,7 +91,7 @@ async fn main() -> std::io::Result<()> {
             )
             .service(web::resource("/subscriptions").route(web::get().to(subscription_route)))
             .service(web::resource("/playground").route(web::get().to(playground_route)))
-            .default_service(web::route().to(|| HttpResponse::NotFound()))
+            .default_service(web::route().to(HttpResponse::NotFound))
     })
     .bind(format!(
         "{}:{}",
@@ -114,9 +113,7 @@ mod test {
     macro_rules! test_server {
         () => {{
             let context = get_context().await;
-            let schema = graphql::schema_builder()
-                .data(context)
-                .finish();
+            let schema = graphql::schema_builder().data(context).finish();
             test::init_service(
                 App::new()
                     .app_data(web::Data::new(schema.clone()))

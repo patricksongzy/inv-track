@@ -10,24 +10,15 @@ use crate::model::modification::{self, ModificationType};
 use crate::model::transaction::Transaction;
 
 /// The id of a location.
-#[derive(
-    PartialEq,
-    Eq,
-    Into,
-    Hash,
-    Copy,
-    Clone,
-    Debug,
-    sqlx::Type,
-    Serialize,
-    Deserialize,
-)]
+#[derive(PartialEq, Eq, Into, Hash, Copy, Clone, Debug, sqlx::Type, Serialize, Deserialize)]
 #[sqlx(transparent)]
 pub(crate) struct LocationId(i32);
 async_graphql::scalar!(LocationId);
 
 /// Location model returned by a query in the inventory tracking system.
-#[derive(Debug, Clone, PartialEq, sqlx::FromRow, Serialize, Deserialize, async_graphql::SimpleObject)]
+#[derive(
+    Debug, Clone, PartialEq, sqlx::FromRow, Serialize, Deserialize, async_graphql::SimpleObject,
+)]
 #[graphql(complex)]
 pub(crate) struct Location {
     id: LocationId,
@@ -49,6 +40,7 @@ pub(crate) async fn get_locations(context: &AppContext) -> Result<Vec<Location>>
     sqlx::query_as::<_, Location>(
         r#"
         select id, name, address from locations
+        order by name
     "#,
     )
     .fetch_all(&*context.clients.postgres)
@@ -88,6 +80,7 @@ pub(crate) async fn get_transactions_by_location_ids(
         r#"
         select id, item_id, location_id, transaction_date, quantity, comment from transactions
         where location_id = any($1)
+        order by transaction_date desc
     "#,
     )
     .bind(ids.into_iter().map(|id| id.0).collect::<Vec<i32>>())
@@ -168,10 +161,7 @@ pub(crate) async fn update_location(
 }
 
 /// Deletes an location, given an id, returning the result, or an error.
-pub(crate) async fn delete_location(
-    context: &AppContext,
-    id: LocationId,
-) -> Result<Location> {
+pub(crate) async fn delete_location(context: &AppContext, id: LocationId) -> Result<Location> {
     let deleted = sqlx::query_as::<_, Location>(
         r#"
         delete from locations
@@ -195,7 +185,8 @@ pub(crate) async fn delete_location(
 impl Location {
     /// The transactions at the location.
     async fn transactions(&self, context: &async_graphql::Context<'_>) -> Vec<Transaction> {
-        context.data_unchecked::<AppContext>()
+        context
+            .data_unchecked::<AppContext>()
             .loaders
             .get::<IdLoader<LocationId, Vec<Transaction>, Clients>>()
             .unwrap()

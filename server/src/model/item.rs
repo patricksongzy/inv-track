@@ -11,32 +11,21 @@ use crate::model::transaction::Transaction;
 use crate::model::validation;
 
 /// The id of an item.
-#[derive(
-    PartialEq,
-    Eq,
-    Into,
-    Hash,
-    Copy,
-    Clone,
-    Debug,
-    sqlx::Type,
-    Serialize,
-    Deserialize,
-)]
+#[derive(PartialEq, Eq, Into, Hash, Copy, Clone, Debug, sqlx::Type, Serialize, Deserialize)]
 #[sqlx(transparent)]
 pub(crate) struct ItemId(i32);
 async_graphql::scalar!(ItemId);
 
 /// The quantity of inventory.
-#[derive(
-    PartialEq, Into, Neg, Copy, Clone, Debug, sqlx::Type, Serialize, Deserialize,
-)]
+#[derive(PartialEq, Into, Neg, Copy, Clone, Debug, sqlx::Type, Serialize, Deserialize)]
 #[sqlx(transparent)]
 pub(crate) struct ItemQuantity(i32);
 async_graphql::scalar!(ItemQuantity);
 
 /// Item model returned by a query in the inventory tracking system.
-#[derive(Debug, Clone, PartialEq, sqlx::FromRow, Serialize, Deserialize, async_graphql::SimpleObject)]
+#[derive(
+    Debug, Clone, PartialEq, sqlx::FromRow, Serialize, Deserialize, async_graphql::SimpleObject,
+)]
 #[graphql(complex)]
 pub(crate) struct Item {
     id: ItemId,
@@ -53,7 +42,9 @@ pub(crate) struct InsertableItem {
     pub(crate) sku: Option<String>,
     #[graphql(validator(min_length = 1))]
     name: String,
+    #[graphql(validator(min_length = 1))]
     supplier: Option<String>,
+    #[graphql(validator(min_length = 1))]
     description: Option<String>,
 }
 
@@ -62,6 +53,7 @@ pub(crate) async fn get_items(context: &AppContext) -> Result<Vec<Item>> {
     sqlx::query_as::<_, Item>(
         r#"
         select id, sku, name, supplier, description from items
+        order by id
     "#,
     )
     .fetch_all(&*context.clients.postgres)
@@ -96,6 +88,7 @@ pub(crate) async fn get_transactions_by_item_ids(
         r#"
         select id, item_id, location_id, transaction_date, quantity, comment from transactions
         where item_id = any($1)
+        order by transaction_date desc
     "#,
     )
     .bind(ids.into_iter().map(|id| id.0).collect::<Vec<i32>>())
@@ -154,7 +147,7 @@ pub(crate) async fn get_item(context: &AppContext, id: ItemId) -> Result<Item> {
 /// Creates an item, given an insertable item, returning the result, or an error.
 pub(crate) async fn create_item(context: &AppContext, item: InsertableItem) -> Result<Item> {
     // check that the sku is unique
-    validation::item::validate_sku(context, &item).await?;
+    validation::item::validate_sku(context, &item, None).await?;
 
     let created = sqlx::query_as::<_, Item>(
         r#"
@@ -183,6 +176,9 @@ pub(crate) async fn update_item(
     id: ItemId,
     item: InsertableItem,
 ) -> Result<Item, Error> {
+    // check that the sku is unique
+    validation::item::validate_sku(context, &item, Some(id)).await?;
+
     let updated = sqlx::query_as::<_, Item>(
         r#"
         update items
@@ -231,7 +227,8 @@ pub(crate) async fn delete_item(context: &AppContext, id: ItemId) -> Result<Item
 impl Item {
     /// The quantity of the item.
     async fn quantity(&self, context: &async_graphql::Context<'_>) -> ItemQuantity {
-        context.data_unchecked::<AppContext>()
+        context
+            .data_unchecked::<AppContext>()
             .loaders
             .get::<IdLoader<ItemId, ItemQuantity, Clients>>()
             .unwrap()
@@ -242,7 +239,8 @@ impl Item {
 
     /// The transactions of the item.
     async fn transactions(&self, context: &async_graphql::Context<'_>) -> Vec<Transaction> {
-        context.data_unchecked::<AppContext>()
+        context
+            .data_unchecked::<AppContext>()
             .loaders
             .get::<IdLoader<ItemId, Vec<Transaction>, Clients>>()
             .unwrap()

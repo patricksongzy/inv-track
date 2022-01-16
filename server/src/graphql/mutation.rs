@@ -96,7 +96,8 @@ impl TransactionMutation {
         id: transaction::TransactionId,
         transaction: transaction::InsertableTransaction,
     ) -> Result<transaction::Transaction> {
-        transaction::update_transaction(context.data_unchecked::<AppContext>(), id, transaction).await
+        transaction::update_transaction(context.data_unchecked::<AppContext>(), id, transaction)
+            .await
     }
 
     /// The mutation to delete a transaction with the given id.

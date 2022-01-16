@@ -43,7 +43,8 @@ where
 
                 // for each result not found, create an error
                 ids.iter().for_each(|id| {
-                    results_map.entry(*id).or_insert(Err(Error::new("not found").extend_with(|_, e| e.set("id", format!("{:?}", id)))));
+                    results_map.entry(*id).or_insert_with(|| Err(Error::new("not found")
+                        .extend_with(|_, e| e.set("id", format!("{:?}", id)))));
                 });
             }
             Err(e) => {
@@ -81,10 +82,7 @@ mod test {
     use super::*;
 
     /// A fake that adds ids to the context.
-    async fn mapper_fake(
-        context: &Option<i32>,
-        ids: Vec<i32>,
-    ) -> Result<HashMap<i32, i32>> {
+    async fn mapper_fake(context: &Option<i32>, ids: Vec<i32>) -> Result<HashMap<i32, i32>> {
         let mut result = HashMap::new();
         ids.into_iter().for_each(|id| {
             result.insert(id, id + context.unwrap());

@@ -23,7 +23,11 @@ struct TransactionSubscription;
 
 /// The root subscription.
 #[derive(async_graphql::MergedSubscription, Default)]
-pub(crate) struct RootSubscription(ItemSubscription, LocationSubscription, TransactionSubscription);
+pub(crate) struct RootSubscription(
+    ItemSubscription,
+    LocationSubscription,
+    TransactionSubscription,
+);
 
 /// A stream of modification results for a given object.
 pub(crate) type ModificationStream<T> =
@@ -70,7 +74,14 @@ impl LocationSubscription {
 #[async_graphql::Subscription]
 impl TransactionSubscription {
     /// The subscription to modifications of transactions.
-    async fn transaction_subscription(&self, context: &Context<'_>) -> ModificationStream<Transaction> {
-        subscription_stream(&context.data_unchecked::<AppContext>().clients, "transactions").await
+    async fn transaction_subscription(
+        &self,
+        context: &Context<'_>,
+    ) -> ModificationStream<Transaction> {
+        subscription_stream(
+            &context.data_unchecked::<AppContext>().clients,
+            "transactions",
+        )
+        .await
     }
 }

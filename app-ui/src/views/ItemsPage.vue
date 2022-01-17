@@ -5,7 +5,7 @@
       <items-list />
     </template>
     <template #fallback>
-      <p>Unable to load items.</p>
+      <p>Loading items...</p>
     </template>
   </Suspense>
   <hr />

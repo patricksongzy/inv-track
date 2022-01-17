@@ -21,6 +21,8 @@ development: `docker compose up`\
 integration tests: `docker compose -f docker-compose.yml -f integration-test.yml up`\
 production: `docker compose -f docker-compose.yml -f production.yml up`
 
+* navigate to `http://localhost:8080` for the UI or use the endpoints at `http://localhost:8000/graphql` and `http://localhost:8000/subscriptions`
+
 ## Using
 * using the playground link allows creating GraphQL requests and receiving responses
 

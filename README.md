@@ -31,7 +31,7 @@ production: `docker compose -f docker-compose.yml -f production.yml up`
   * the front-end includes an inefficient implementation of auto-updating from subscriptions
 
 ![viewing all locations](./images/transactions.png)
-* clicking on the link on the right-hand side of the table gives a detailed view and options to edit or delete
+* clicking on the links on the right-hand side of the tables on the list pages give a detailed view and options to edit or delete
 
 ![viewing a location](./images/location.png)
 
@@ -42,7 +42,7 @@ production: `docker compose -f docker-compose.yml -f production.yml up`
 * Docker Compose
 
 ## GraphQL
-* chose GraphQL of the amount of querying done (also because it's interesting)
+* chose GraphQL because of the amount of querying done (also because it's interesting)
 * API endpoint is `/graphql`, playground IDE is `/playground`
 * source code in `/server/src/graphql`
 ## Batching Dataloaders (N+1 Problem)
@@ -57,7 +57,7 @@ production: `docker compose -f docker-compose.yml -f production.yml up`
 * note if we were to add shipments, they would comprise multiple transactions
 
 ## Tetsting
-* tests are located in `/server/src/main.rs` and `/server/src/batcher/id_loader.rs`
+* tests are located in `/server/src/main.rs` and `/server/src/batcher/id_loader.rs` in `mod test`
 
 ## Extensibility
 * **add pagination** with cursors (<https://async-graphql.github.io/async-graphql/en/cursor_connections.html>)

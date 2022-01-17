@@ -5,7 +5,7 @@
       <transactions-list />
     </template>
     <template #fallback>
-      <p>Unable to load transactions.</p>
+      <p>Loading transactions.</p>
     </template>
   </Suspense>
   <hr />

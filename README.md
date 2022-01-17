@@ -20,7 +20,7 @@ production: `docker compose -f docker-compose.yml -f production.yml up`
 * using the (very basic) front-end allows for all the basic operations
   * the front-end includes an inefficient implementation of auto-updating from subscriptions
 
-![viewing all locations](./images/locations.png)
+![viewing all locations](./images/transactions.png)
 * clicking on the link on the right-hand side of the table gives a detailed view and options to edit or delete
 
 ![viewing a location](./images/location.png)

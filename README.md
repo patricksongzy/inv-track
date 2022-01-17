@@ -9,6 +9,7 @@
 ## Live Demo
 * the (very minimal) front-end is at <https://patricksongzy-inv-track.netlify.app/>
   * **note** the API is deployed on Heroku, which sleeps when not used, meaning on initial visit, the items and other data might appear to be taking a long time to load
+  * the front-end is only meant as a demonstration for the back-end and has no features front-ends should have (missing front-end validation, less efficient subscription handling, etc.)
 * the API server is at <https://patricksongzy-inv-track.herokuapp.com/playground> (this is the GraphQL playground/IDE link)
   * the endpoints are [/graphql](https://patricksongzy-inv-track.herokuapp.com/graphql) and [/subscriptions](https://patricksongzy-inv-track.herokuapp.com/subscriptions)
   * all other pages 404

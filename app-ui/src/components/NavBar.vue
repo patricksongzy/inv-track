@@ -11,7 +11,7 @@
       >
     </div>
     <div class="navbar-end">
-      <a v-bind:href="`http://${api_url}/playground`" class="navbar-item"
+      <a v-bind:href="`${protocol}${api_url}/playground`" class="navbar-item"
         >GraphQL Playground</a
       >
     </div>
@@ -22,6 +22,7 @@ export default {
   data() {
     return {
       api_url: process.env.VUE_APP_API_ADDRESS,
+      protocol: process.env.VUE_APP_PROTOCOL,
     };
   },
 };

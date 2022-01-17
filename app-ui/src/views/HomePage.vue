@@ -3,7 +3,7 @@
   <p>Navigate to any of the pages in the navbar to begin.</p>
   <p>
     Or visit
-    <a v-bind:href="`http://${api_url}/playground`">the GraphQL playground</a>.
+    <a v-bind:href="`${protocol}${api_url}/playground`">the GraphQL playground</a>.
   </p>
 </template>
 <script>
@@ -11,6 +11,7 @@ export default {
   data() {
     return {
       api_url: process.env.VUE_APP_API_ADDRESS,
+      protocol: process.env.VUE_APP_PROTOCOL,
     };
   },
 };

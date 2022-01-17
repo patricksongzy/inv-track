@@ -15,7 +15,7 @@ async-trait = "0.1.52"
 chrono = { version = "0.4.19", features = ["serde"] }
 serde = "1.0.133"
 serde_json = "1.0.74"
-sqlx = { version = "0.5.10",  features = ["runtime-actix-native-tls", "postgres", "chrono"] }
+sqlx = { version = "0.5.10",  features = ["runtime-actix-native-tls", "postgres", "chrono", "offline"] }
 tokio-stream = "0.1.8"
 futures = "0.3.19"
 redis = { version = "0.21.5", features = ["tokio-comp", "aio"] }

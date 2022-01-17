@@ -11,8 +11,7 @@
 
 development: `docker compose up`\
 integration tests: `docker compose -f docker-compose.yml -f integration-test.yml up`\
-optimized: `docker compose -f docker-compose.yml -f optimized.yml up`
-* for production, use the multi-stage build instead located in `./server/Dockerfile.production`
+production: `docker compose -f docker-compose.yml -f production.yml up`
 
 ## Using
 * using the playground link allows creating GraphQL requests and receiving responses

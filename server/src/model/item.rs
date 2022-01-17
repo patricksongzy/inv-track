@@ -3,6 +3,7 @@ use std::fmt::Debug;
 
 use async_graphql::{Error, Result};
 use serde::{Deserialize, Serialize};
+use sqlx::Row;
 
 use crate::batcher::id_loader::IdLoader;
 use crate::graphql::{AppContext, Clients};
@@ -112,14 +113,13 @@ pub(crate) async fn get_quantities_by_item_ids(
     clients: &Clients,
     ids: Vec<ItemId>,
 ) -> Result<HashMap<ItemId, ItemQuantity>> {
-    let results = sqlx::query!(
+    let results = sqlx::query(
         r#"
         select item_id, coalesce(sum(quantity), 0) from transactions
         where item_id = any($1)
         group by item_id
-    "#,
-        &ids.into_iter().map(|id| id.0).collect::<Vec<i32>>()
-    )
+    "#)
+    .bind(&ids.into_iter().map(|id| id.0).collect::<Vec<i32>>())
     .fetch_all(&*clients.postgres)
     .await
     .map_err(Error::from)?;
@@ -127,10 +127,11 @@ pub(crate) async fn get_quantities_by_item_ids(
     let mut results_map = HashMap::new();
     for result in results {
         results_map.insert(
-            ItemId(result.item_id),
-            ItemQuantity(i32::try_from(result.coalesce.unwrap_or(0))?),
+            ItemId(result.try_get("item_id")?),
+            ItemQuantity(i32::try_from(result.try_get::<Option<i64>, _>("coalesce")?.unwrap_or(0))?),
         );
     }
+
     Ok(results_map)
 }
 

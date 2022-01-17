@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use async_graphql::{Error, ErrorExtensions, Result};
+use sqlx::Row;
 
 use crate::graphql::AppContext;
 
@@ -32,14 +33,14 @@ pub(crate) mod transaction {
         let mut errors = HashMap::new();
 
         // check item exists
-        let item_count = sqlx::query!(
+        let item_count = sqlx::query(
             r#"select count(id) from items where id = $1"#,
-            i32::from(transaction.item_id)
         )
+        .bind(i32::from(transaction.item_id))
         .fetch_one(&*context.clients.postgres)
         .await
         .map_err(Error::from)?
-        .count
+        .try_get::<Option<i64>, _>("count")?
         .unwrap_or(0);
 
         if item_count != 1 {
@@ -51,14 +52,14 @@ pub(crate) mod transaction {
 
         // check location exists
         if let Some(location_id) = transaction.location_id {
-            let location_count = sqlx::query!(
+            let location_count = sqlx::query(
                 r#"select count(id) from locations where id = $1"#,
-                i32::from(location_id)
             )
+            .bind(i32::from(location_id))
             .fetch_one(&*context.clients.postgres)
             .await
             .map_err(Error::from)?
-            .count
+            .try_get::<Option<i64>, _>("count")?
             .unwrap_or(0);
 
             if location_count != 1 {
@@ -91,17 +92,18 @@ pub(crate) mod item {
         id: Option<ItemId>,
     ) -> Result<()> {
         if let Some(sku) = &item.sku {
-            let id_match = sqlx::query!(
+            let id_match = sqlx::query(
                 r#"
                 select id from items
                 where upper(sku) = upper($1)
-                "#,
-                sku,
+                "#
             )
+            .bind(sku)
             .fetch_optional(&*context.clients.postgres)
             .await
             .map_err(Error::from)?
-            .map(|v| v.id);
+            .map(|r| r.try_get("id"))
+            .map_or(Ok(None), |v| v.map(Some))?;
 
             if id_match.is_none() || id.map(i32::from) == id_match {
                 Ok(())

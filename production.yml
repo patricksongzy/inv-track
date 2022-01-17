@@ -7,6 +7,6 @@ services:
       context: ./server
       dockerfile: Dockerfile.production
     restart: on-failure
-    command: [sh, -c, "/usr/local/bin/sqlx migrate run && /usr/local/bin/server"]
+    command: [sh, -c, "./sqlx database create && ./sqlx migrate run && ./inv-track"]
   db:
     restart: on-failure

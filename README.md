@@ -6,6 +6,12 @@
 * see [Extensibility](#extensibility) for future improvements
 * feature: create locations and assign inventory
 
+## Live Demo
+* the (very minimal) front-end is at <https://inv-track.netlify.app/>
+* the API server is at <https://patricksongzy-inv-track.herokuapp.com/playground> (this is the GraphQL playground/IDE link)
+  * the endpoints are [/graphql](https://patricksongzy-inv-track.herokuapp.com/graphql) and [/subscriptions](https://patricksongzy-inv-track.herokuapp.com/subscriptions)
+  * all other pages 404
+
 ## Running
 * **note** docker compose v3 is required, but this is the **only** dependency to serve this project (because docker <3)
 

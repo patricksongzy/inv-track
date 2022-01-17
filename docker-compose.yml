@@ -19,7 +19,7 @@ services:
     environment:
       ACTIX_ADDRESS: ${ACTIX_ADDRESS}
       PORT: ${ACTIX_PORT}
-      REDIS_ADDRESS: redis://redis:6379/
+      REDIS_URL: redis://redis:6379/
       DATABASE_MAX_CONNECTIONS: ${DATABASE_MAX_CONNECTIONS}
       DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db/${DATABASE_NAME}
     depends_on:

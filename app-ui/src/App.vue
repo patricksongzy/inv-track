@@ -30,11 +30,11 @@ export default {
   },
   setup() {
     const wsClient = createWsClient({
-      url: `ws://${process.env.VUE_APP_API_ADDRESS}/subscriptions`,
+      url: `wss://${process.env.VUE_APP_API_ADDRESS}/subscriptions`,
     });
 
     const client = createClient({
-      url: `http://${process.env.VUE_APP_API_ADDRESS}/graphql`,
+      url: `https://${process.env.VUE_APP_API_ADDRESS}/graphql`,
       exchanges: [
         ...defaultExchanges,
         subscriptionExchange({

@@ -7,6 +7,8 @@ services:
     environment:
       PORT: ${VUE_PORT}
       VUE_APP_API_ADDRESS: ${VUE_APP_API_ADDRESS}
+      VUE_APP_PROTOCOL: http://
+      VUE_APP_WS_PROTOCOL: ws://
     depends_on:
       - server
     volumes:

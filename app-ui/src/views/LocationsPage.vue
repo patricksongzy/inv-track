@@ -5,7 +5,7 @@
       <locations-list />
     </template>
     <template #fallback>
-      <p>Unable to load locations.</p>
+      <p>Loading locations...</p>
     </template>
   </Suspense>
   <hr />

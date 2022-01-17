@@ -38,7 +38,7 @@
       </p>
       <p>
         <strong>Transaction Date</strong>:
-        {{ transaction.transactionDate?.split('T')[0] ?? '--' }}
+        {{ transaction.transactionDate ?? '--' }}
       </p>
       <p><strong>Quantity</strong>: {{ transaction.quantity }}</p>
       <p><strong>Comment</strong>: {{ transaction.comment ?? '--' }}</p>
@@ -48,7 +48,7 @@
         v-on:submit="isEdit = false"
         :initialItemId="transaction.item.id"
         :initialLocationId="transaction.location?.id"
-        :initialTransactionDate="transaction.transactionDate?.split('T')[0]"
+        :initialTransactionDate="new Date(transaction.transactionDate)?.toISOString()?.slice(0, 16)"
         :initialQuantity="transaction.quantity"
         :initialComment="transaction.comment"
       />

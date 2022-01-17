@@ -40,7 +40,7 @@
               >
               <div v-else>--</div>
             </td>
-            <td>{{ transaction.transactionDate?.split('T')[0] ?? '--' }}</td>
+            <td>{{ transaction.transactionDate ?? '--' }}</td>
             <td>{{ transaction.quantity }}</td>
             <td>{{ transaction.comment ?? '--' }}</td>
             <td>

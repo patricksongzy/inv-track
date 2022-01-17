@@ -31,7 +31,7 @@
               <td>{{ transaction?.location?.id ?? '--' }}</td>
               <td>{{ transaction?.location?.name ?? '--' }}</td>
               <td>{{ transaction?.location?.address ?? '--' }}</td>
-              <td>{{ transaction.transactionDate?.split('T')[0] ?? '--' }}</td>
+              <td>{{ transaction.transactionDate ?? '--' }}</td>
               <td>{{ transaction.quantity }}</td>
             </tr>
           </tbody>

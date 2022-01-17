@@ -58,7 +58,7 @@
               <td>{{ transaction.item.id ?? '--' }}</td>
               <td>{{ transaction.item.sku ?? '--' }}</td>
               <td>{{ transaction.item.name ?? '--' }}</td>
-              <td>{{ transaction.transactionDate?.split('T')[0] ?? '--' }}</td>
+              <td>{{ transaction.transactionDate ?? '--' }}</td>
               <td>{{ transaction.quantity }}</td>
             </tr>
           </tbody>
@@ -210,7 +210,7 @@ export default {
         } else {
           items.set(transaction.item.id, {
             name: transaction.item.name,
-            sku: transaction.item.name,
+            sku: transaction.item.sku,
             quantity: transaction.quantity,
           });
         }

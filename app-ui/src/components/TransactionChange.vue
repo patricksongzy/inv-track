@@ -27,7 +27,7 @@
     <div class="field">
       <label class="label">Transaction Date</label>
       <div class="control">
-        <input type="date" v-model="transactionDate" />
+        <input type="datetime-local" v-model="transactionDate" />
       </div>
     </div>
     <div class="field">

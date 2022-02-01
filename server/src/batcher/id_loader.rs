@@ -15,7 +15,7 @@ use crate::batcher;
 /// The keys, `K` are mapped to the values, `T`.
 /// The IdMapper takes in some context `C`.
 pub(crate) type IdMapper<K, T, C> =
-    fn(&C, Vec<K>) -> Pin<Box<dyn Future<Output = Result<HashMap<K, T>>> + Send + '_>>;
+    fn(&C, Vec<K>) -> Pin<Box<dyn Future<Output = Result<HashMap<K, Result<T>>>> + Send + '_>>;
 
 /// Handles batched loading of results by ids.
 pub(crate) struct IdBatcher<K, T, C> {
@@ -39,7 +39,7 @@ where
         match (self.results_by_id)(&self.context, ids.to_vec()).await {
             Ok(results) => {
                 // add the results to the map
-                results_map.extend(results.into_iter().map(|(id, result)| (id, Ok(result))));
+                results_map.extend(results.into_iter().map(|(id, result)| (id, result)));
 
                 // for each result not found, create an error
                 ids.iter().for_each(|id| {
@@ -82,16 +82,16 @@ mod test {
     use super::*;
 
     /// A fake that adds ids to the context.
-    async fn mapper_fake(context: &Option<i32>, ids: Vec<i32>) -> Result<HashMap<i32, i32>> {
+    async fn mapper_fake(context: &Option<i32>, ids: Vec<i32>) -> Result<HashMap<i32, Result<i32>>> {
         let mut result = HashMap::new();
         ids.into_iter().for_each(|id| {
-            result.insert(id, id + context.unwrap());
+            result.insert(id, Ok(id + context.unwrap()));
         });
         Ok(result)
     }
 
     /// A fake that returns an error.
-    async fn mapper_fail_fake(_: &Option<i32>, _: Vec<i32>) -> Result<HashMap<i32, i32>> {
+    async fn mapper_fail_fake(_: &Option<i32>, _: Vec<i32>) -> Result<HashMap<i32, Result<i32>>> {
         Err(Error::new("error"))
     }
 

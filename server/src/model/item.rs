@@ -66,7 +66,7 @@ pub(crate) async fn get_items(context: &AppContext) -> Result<Vec<Item>> {
 pub(crate) async fn get_items_by_ids(
     clients: &Clients,
     ids: Vec<ItemId>,
-) -> Result<HashMap<ItemId, Item>> {
+) -> Result<HashMap<ItemId, Result<Item>>> {
     sqlx::query_as::<_, Item>(
         r#"
         select id, sku, name, supplier, description from items
@@ -76,7 +76,7 @@ pub(crate) async fn get_items_by_ids(
     .bind(ids.into_iter().map(|id| id.0).collect::<Vec<i32>>())
     .fetch_all(&*clients.postgres)
     .await
-    .map(|items| items.into_iter().map(|item| (item.id, item)).collect())
+    .map(|items| items.into_iter().map(|item| (item.id, Ok(item))).collect())
     .map_err(Error::from)
 }
 
@@ -84,7 +84,7 @@ pub(crate) async fn get_items_by_ids(
 pub(crate) async fn get_transactions_by_item_ids(
     clients: &Clients,
     ids: Vec<ItemId>,
-) -> Result<HashMap<ItemId, Vec<Transaction>>> {
+) -> Result<HashMap<ItemId, Result<Vec<Transaction>>>> {
     sqlx::query_as::<_, Transaction>(
         r#"
         select id, item_id, location_id, transaction_date, quantity, comment from transactions
@@ -103,7 +103,7 @@ pub(crate) async fn get_transactions_by_item_ids(
                 .or_insert(Vec::new())
                 .push(transaction);
         });
-        transactions_map
+        transactions_map.into_iter().map(|(key, value)| (key, Ok(value))).collect() 
     })
     .map_err(Error::from)
 }
@@ -112,7 +112,7 @@ pub(crate) async fn get_transactions_by_item_ids(
 pub(crate) async fn get_quantities_by_item_ids(
     clients: &Clients,
     ids: Vec<ItemId>,
-) -> Result<HashMap<ItemId, ItemQuantity>> {
+) -> Result<HashMap<ItemId, Result<ItemQuantity>>> {
     let results = sqlx::query(
         r#"
         select item_id, coalesce(sum(quantity), 0) from transactions
@@ -128,7 +128,9 @@ pub(crate) async fn get_quantities_by_item_ids(
     for result in results {
         results_map.insert(
             ItemId(result.try_get("item_id")?),
-            ItemQuantity(i32::try_from(result.try_get::<Option<i64>, _>("coalesce")?.unwrap_or(0))?),
+            i32::try_from(result.try_get::<Option<i64>, _>("coalesce")?.unwrap_or(0))
+                .map(|quantity| ItemQuantity(quantity))
+                .map_err(Error::from),
         );
     }
 

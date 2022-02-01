@@ -52,7 +52,7 @@ pub(crate) async fn get_locations(context: &AppContext) -> Result<Vec<Location>>
 pub(crate) async fn get_locations_by_ids(
     clients: &Clients,
     ids: Vec<LocationId>,
-) -> Result<HashMap<LocationId, Location>> {
+) -> Result<HashMap<LocationId, Result<Location>>> {
     sqlx::query_as::<_, Location>(
         r#"
         select id, name, address from locations
@@ -65,7 +65,7 @@ pub(crate) async fn get_locations_by_ids(
     .map(|locations| {
         locations
             .into_iter()
-            .map(|location| (location.id, location))
+            .map(|location| (location.id, Ok(location)))
             .collect()
     })
     .map_err(Error::from)
@@ -75,7 +75,7 @@ pub(crate) async fn get_locations_by_ids(
 pub(crate) async fn get_transactions_by_location_ids(
     clients: &Clients,
     ids: Vec<LocationId>,
-) -> Result<HashMap<LocationId, Vec<Transaction>>> {
+) -> Result<HashMap<LocationId, Result<Vec<Transaction>>>> {
     sqlx::query_as::<_, Transaction>(
         r#"
         select id, item_id, location_id, transaction_date, quantity, comment from transactions
@@ -94,7 +94,7 @@ pub(crate) async fn get_transactions_by_location_ids(
                 .or_insert(Vec::new())
                 .push(transaction);
         });
-        transactions_map
+        transactions_map.into_iter().map(|(key, value)| (key, Ok(value))).collect()
     })
     .map_err(Error::from)
 }

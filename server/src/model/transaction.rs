@@ -64,7 +64,7 @@ pub(crate) async fn get_transactions(context: &AppContext) -> Result<Vec<Transac
 pub(crate) async fn get_transactions_by_ids(
     clients: &Clients,
     ids: Vec<TransactionId>,
-) -> Result<HashMap<TransactionId, Transaction>> {
+) -> Result<HashMap<TransactionId, Result<Transaction>>> {
     sqlx::query_as::<_, Transaction>(
         r#"
         select id, item_id, location_id, transaction_date, quantity, comment from transactions
@@ -77,7 +77,7 @@ pub(crate) async fn get_transactions_by_ids(
     .map(|transactions| {
         transactions
             .into_iter()
-            .map(|transaction| (transaction.id, transaction))
+            .map(|transaction| (transaction.id, Ok(transaction)))
             .collect()
     })
     .map_err(Error::from)

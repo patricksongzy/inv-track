@@ -57,7 +57,7 @@ production: `docker compose -f docker-compose.yml -f production.yml up`
 * a transaction is a change in quantity for an item (optionally at a location)
 * note if we were to add shipments, they would comprise multiple transactions
 
-## Tetsting
+## Testing
 * tests are located in `/server/src/main.rs` and `/server/src/batcher/id_loader.rs` in `mod test`
 
 ## Extensibility

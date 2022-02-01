@@ -91,10 +91,13 @@ pub(crate) async fn get_transactions_by_location_ids(
         transactions.into_iter().for_each(|transaction| {
             transactions_map
                 .entry(transaction.location_id.unwrap())
-                .or_insert(Vec::new())
+                .or_insert_with(Vec::new)
                 .push(transaction);
         });
-        transactions_map.into_iter().map(|(key, value)| (key, Ok(value))).collect()
+        transactions_map
+            .into_iter()
+            .map(|(key, value)| (key, Ok(value)))
+            .collect()
     })
     .map_err(Error::from)
 }

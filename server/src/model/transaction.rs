@@ -103,6 +103,12 @@ pub(crate) async fn create_transaction(
 ) -> Result<Transaction> {
     // check that the item and location exist
     validation::transaction::validate_ids(context, &transaction).await?;
+    validation::transaction::validate_item_quantities(
+        context,
+        transaction.item_id,
+        transaction.quantity,
+    )
+    .await?;
 
     let created = sqlx::query_as::<_, Transaction>(
         r#"
@@ -134,8 +140,15 @@ pub(crate) async fn update_transaction(
     id: TransactionId,
     transaction: InsertableTransaction,
 ) -> Result<Transaction> {
+    let previous_transaction = get_transaction(context, id).await?;
     // check that the item and location exist
     validation::transaction::validate_ids(context, &transaction).await?;
+    validation::transaction::validate_item_quantities(
+        context,
+        transaction.item_id,
+        transaction.quantity - previous_transaction.quantity,
+    )
+    .await?;
 
     let updated = sqlx::query_as::<_, Transaction>(
         r#"
@@ -168,6 +181,14 @@ pub(crate) async fn delete_transaction(
     context: &AppContext,
     id: TransactionId,
 ) -> Result<Transaction> {
+    let transaction = get_transaction(context, id).await?;
+    validation::transaction::validate_item_quantities(
+        context,
+        transaction.item_id,
+        -transaction.quantity,
+    )
+    .await?;
+
     let deleted = sqlx::query_as::<_, Transaction>(
         r#"
         delete from transactions

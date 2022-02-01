@@ -18,7 +18,9 @@ pub(crate) struct ItemId(i32);
 async_graphql::scalar!(ItemId);
 
 /// The quantity of inventory.
-#[derive(PartialEq, Into, Neg, Copy, Clone, Debug, sqlx::Type, Serialize, Deserialize)]
+#[derive(
+    PartialEq, Into, Neg, Copy, Clone, Debug, Add, Sub, sqlx::Type, Serialize, Deserialize,
+)]
 #[sqlx(transparent)]
 pub(crate) struct ItemQuantity(i32);
 async_graphql::scalar!(ItemQuantity);
@@ -100,10 +102,13 @@ pub(crate) async fn get_transactions_by_item_ids(
         transactions.into_iter().for_each(|transaction| {
             transactions_map
                 .entry(transaction.item_id)
-                .or_insert(Vec::new())
+                .or_insert_with(Vec::new)
                 .push(transaction);
         });
-        transactions_map.into_iter().map(|(key, value)| (key, Ok(value))).collect() 
+        transactions_map
+            .into_iter()
+            .map(|(key, value)| (key, Ok(value)))
+            .collect()
     })
     .map_err(Error::from)
 }
@@ -118,7 +123,8 @@ pub(crate) async fn get_quantities_by_item_ids(
         select item_id, coalesce(sum(quantity), 0) from transactions
         where item_id = any($1)
         group by item_id
-    "#)
+    "#,
+    )
     .bind(&ids.into_iter().map(|id| id.0).collect::<Vec<i32>>())
     .fetch_all(&*clients.postgres)
     .await
@@ -129,7 +135,7 @@ pub(crate) async fn get_quantities_by_item_ids(
         results_map.insert(
             ItemId(result.try_get("item_id")?),
             i32::try_from(result.try_get::<Option<i64>, _>("coalesce")?.unwrap_or(0))
-                .map(|quantity| ItemQuantity(quantity))
+                .map(ItemQuantity)
                 .map_err(Error::from),
         );
     }

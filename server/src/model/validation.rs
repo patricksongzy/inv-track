@@ -10,7 +10,9 @@ pub(crate) mod transaction {
 
     use async_graphql::CustomValidator;
 
-    use crate::model::item::ItemQuantity;
+    use crate::batcher::id_loader::IdLoader;
+    use crate::graphql::Clients;
+    use crate::model::item::{ItemId, ItemQuantity};
     use crate::model::transaction::InsertableTransaction;
 
     pub(crate) struct TransactionQuantityValidator {}
@@ -25,6 +27,27 @@ pub(crate) mod transaction {
         }
     }
 
+    /// Validates that the item does not exceed integer bounds after this transaction.
+    pub(crate) async fn validate_item_quantities(
+        context: &AppContext,
+        item_id: ItemId,
+        quantity: ItemQuantity,
+    ) -> Result<()> {
+        let current_quantity = context
+            .loaders
+            .get::<IdLoader<ItemId, ItemQuantity, Clients>>()
+            .unwrap()
+            .load(item_id)
+            .await
+            .map(i32::from)
+            .unwrap_or(0);
+        if current_quantity.checked_add(i32::from(quantity)).is_none() {
+            Err(Error::new("Transaction causes item quantity to overflow."))
+        } else {
+            Ok(())
+        }
+    }
+
     /// Validates that the item and location for a transaction exist.
     pub(crate) async fn validate_ids(
         context: &AppContext,
@@ -33,15 +56,13 @@ pub(crate) mod transaction {
         let mut errors = HashMap::new();
 
         // check item exists
-        let item_count = sqlx::query(
-            r#"select count(id) from items where id = $1"#,
-        )
-        .bind(i32::from(transaction.item_id))
-        .fetch_one(&*context.clients.postgres)
-        .await
-        .map_err(Error::from)?
-        .try_get::<Option<i64>, _>("count")?
-        .unwrap_or(0);
+        let item_count = sqlx::query(r#"select count(id) from items where id = $1"#)
+            .bind(i32::from(transaction.item_id))
+            .fetch_one(&*context.clients.postgres)
+            .await
+            .map_err(Error::from)?
+            .try_get::<Option<i64>, _>("count")?
+            .unwrap_or(0);
 
         if item_count != 1 {
             errors.insert(
@@ -52,15 +73,13 @@ pub(crate) mod transaction {
 
         // check location exists
         if let Some(location_id) = transaction.location_id {
-            let location_count = sqlx::query(
-                r#"select count(id) from locations where id = $1"#,
-            )
-            .bind(i32::from(location_id))
-            .fetch_one(&*context.clients.postgres)
-            .await
-            .map_err(Error::from)?
-            .try_get::<Option<i64>, _>("count")?
-            .unwrap_or(0);
+            let location_count = sqlx::query(r#"select count(id) from locations where id = $1"#)
+                .bind(i32::from(location_id))
+                .fetch_one(&*context.clients.postgres)
+                .await
+                .map_err(Error::from)?
+                .try_get::<Option<i64>, _>("count")?
+                .unwrap_or(0);
 
             if location_count != 1 {
                 errors.insert(
@@ -96,7 +115,7 @@ pub(crate) mod item {
                 r#"
                 select id from items
                 where upper(sku) = upper($1)
-                "#
+                "#,
             )
             .bind(sku)
             .fetch_optional(&*context.clients.postgres)

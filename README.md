@@ -2,18 +2,9 @@
 * a simple inventory tracking web application with
   * GraphQL queries, mutations and subscriptions (with Redis PubSub)
   * batching dataloaders (N+1 problem)
-  * docker compose for development, test and production
+  * Docker Compose for development and test, with minimised Docker image for production
 * see [Extensibility](#extensibility) for future improvements
 * feature: create locations and assign inventory
-
-## Live Demo
-* the (very minimal) front-end is at <https://patricksongzy-inv-track.netlify.app/>
-  * **note** the API is deployed on Heroku, which sleeps when not used, meaning on initial visit, the items and other data might appear to be taking a long time to load
-  * the front-end is only meant as a demonstration for the back-end and has no features front-ends should have (missing front-end validation, less efficient subscription handling, etc.)
-* the API server is at <https://patricksongzy-inv-track.herokuapp.com/playground> (this is the GraphQL playground/IDE link)
-  * the endpoints are [/graphql](https://patricksongzy-inv-track.herokuapp.com/graphql) and [/subscriptions](https://patricksongzy-inv-track.herokuapp.com/subscriptions)
-  * all other pages 404
-* **note** there is no authentication, so hopefully nothing weird happens while this stays deployed
 
 ## Running
 * **note** docker compose v3 is required, but this is the **only** dependency to serve this project (because docker <3)
@@ -63,12 +54,14 @@ production: `docker compose -f docker-compose.yml -f production.yml up`
 ## Extensibility
 * **add pagination** with cursors (<https://async-graphql.github.io/async-graphql/en/cursor_connections.html>)
 * add query complexity and depth limits (<https://async-graphql.github.io/async-graphql/en/depth_and_complexity.html>)
-* use SeaORM instead of SQLx (not an ORM)
+* ~~use SeaORM instead of SQLx (not an ORM)~~ from experience I'd like to stick with raw queries
   * used SQLx since it was interesting to write queries out instead of using an ORM language
 * we explicitly choose to allow for negative quantities
   * in the future, warnings can be added to the response
 * use interfaces to return errors and make errors more up-to-spec
-* ideally we would be using NginX in the docker environment, but since we're not as focused on deployment, the current setup works
+* ideally we would be using something like Nginx, but since we're not as focused on deployment, the current setup works
+  * in fact, Kubernetes would be a sensible choice, along with making sure everything here is stateless to make this **highly available** - which for subscriptions, is implemented using Redis
+* `anymap` should be replaced by another crate - critical
 
 ## Third-party Crates and Packages
 * multiple open-source crates and packages were used to build this. Their licences are included below

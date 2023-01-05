@@ -8,7 +8,7 @@ use crate::graphql::AppContext;
 pub(crate) mod transaction {
     use super::*;
 
-    use async_graphql::CustomValidator;
+    use async_graphql::{CustomValidator, InputValueError};
 
     use crate::batcher::id_loader::IdLoader;
     use crate::graphql::Clients;
@@ -18,9 +18,9 @@ pub(crate) mod transaction {
     pub(crate) struct TransactionQuantityValidator {}
 
     impl CustomValidator<ItemQuantity> for TransactionQuantityValidator {
-        fn check(&self, value: &ItemQuantity) -> Result<(), String> {
+        fn check(&self, value: &ItemQuantity) -> Result<(), InputValueError<ItemQuantity>> {
             if i32::from(*value) == 0 {
-                Err("Transaction cannot have quantity of 0.".to_string())
+                Err(InputValueError::custom("Transaction cannot have quantity of 0.".to_string()))
             } else {
                 Ok(())
             }

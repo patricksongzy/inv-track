@@ -1,0 +1,4 @@
+version: '3.8'
+services:
+  ui:
+    command: [sh, -c, "npm run --silent production"]

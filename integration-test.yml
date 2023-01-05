@@ -1,6 +1,4 @@
 version: '3.8'
 services:
-  ui:
-    command: [sh, -c, "echo UI is disabled for integration test"]
   server:
     command: [sh, -c, "sqlx database create && sqlx migrate run && cargo test -- --test-threads=1"]

@@ -61,7 +61,6 @@ production: `docker compose -f docker-compose.yml -f production.yml up`
 * use interfaces to return errors and make errors more up-to-spec
 * ideally we would be using something like Nginx, but since we're not as focused on deployment, the current setup works
   * in fact, Kubernetes would be a sensible choice, along with making sure everything here is stateless to make this **highly available** - which for subscriptions, is implemented using Redis
-* `anymap` should be replaced by another crate - critical
 
 ## Third-party Crates and Packages
 * multiple open-source crates and packages were used to build this. Their licences are included below
@@ -71,7 +70,6 @@ production: `docker compose -f docker-compose.yml -f production.yml up`
 | Crate         | Licence                                                                       |
 |---------------|-------------------------------------------------------------------------------|
 | actix         | [MIT/Apache 2.0](https://github.com/actix/actix#license)                      |
-| anymap        | [MIT/Apache 2.0](https://github.com/chris-morgan/anymap#license)              |
 | async-graphql | [MIT/Apache 2.0](https://github.com/async-graphql/async-graphql#license)      |
 | async-trait   | [MIT/Apache 2.0](https://github.com/dtolnay/async-trait#license)              |
 | chrono        | [MIT/Apache 2.0](https://github.com/chronotope/chrono/blob/main/LICENSE.txt)  |

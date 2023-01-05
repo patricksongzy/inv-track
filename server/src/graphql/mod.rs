@@ -22,7 +22,7 @@ pub(crate) struct Clients {
 #[derive(Clone)]
 pub(crate) struct AppContext {
     pub(crate) clients: Clients,
-    pub(crate) loaders: Arc<anymap::Map<dyn anymap::any::Any + Send + Sync>>,
+    pub(crate) loaders: Arc<anymap2::Map<dyn anymap2::any::Any + Send + Sync>>,
 }
 
 pub(crate) type AppSchema = Schema<RootQuery, RootMutation, RootSubscription>;

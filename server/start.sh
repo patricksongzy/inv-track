@@ -1,3 +1,3 @@
 #!/bin/sh
-./sqlx migrate run
+sqlx migrate run
 ./inv-track

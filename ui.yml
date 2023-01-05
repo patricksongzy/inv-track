@@ -1,0 +1,16 @@
+version: '3.8'
+services:
+  ui:
+    build: ./app-ui
+    ports:
+      - "${VUE_PORT}:${VUE_PORT}"
+    environment:
+      PORT: ${VUE_PORT}
+      VUE_APP_API_ADDRESS: ${VUE_APP_API_ADDRESS}
+      VUE_APP_PROTOCOL: http://
+      VUE_APP_WS_PROTOCOL: ws://
+    depends_on:
+      - server
+    volumes:
+      - ./app-ui:/usr/src/app/app-ui
+    command: [sh, -c, "npm run --silent serve"]

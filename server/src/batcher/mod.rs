@@ -9,7 +9,7 @@ pub(crate) const LOADER_YIELD_COUNT: usize = 100;
 /// Registers the batching data loaders for each retrieval type.
 pub(crate) fn register_loaders(
     clients: &Clients,
-    loaders: &mut anymap::Map<dyn anymap::any::Any + Send + Sync>,
+    loaders: &mut anymap2::Map<dyn anymap2::any::Any + Send + Sync>,
 ) {
     // get an item by id
     loaders.insert(id_loader::get_loader(clients, |clients, ids| {

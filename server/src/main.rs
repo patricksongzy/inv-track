@@ -57,7 +57,7 @@ async fn get_context() -> AppContext {
 
     let clients = Clients { postgres, redis };
 
-    let mut loaders = anymap::Map::new();
+    let mut loaders = anymap2::Map::new();
     batcher::register_loaders(&clients, &mut loaders);
 
     AppContext {
